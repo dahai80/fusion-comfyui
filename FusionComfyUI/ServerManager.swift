@@ -5,7 +5,7 @@ private let logger = Logger(label: "FusionComfyUI.ServerManager")
 
 final class ServerManager: ObservableObject {
     @Published var isRunning = false
-    @Published var port: Int = 8188
+    @Published var port: Int = 11443
     @Published var host: String = "127.0.0.1"
 
     private var process: Process?

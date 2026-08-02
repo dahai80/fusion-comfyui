@@ -11,13 +11,13 @@ Built on [fusion-mlx](https://github.com/dahai80/fusion-mlx) engine — FLUX.2, 
 pip install -e .
 
 # Run standalone server (pure MLX, no PyTorch)
-fusion-comfyui serve --port 8188
+fusion-comfyui serve --port 11443
 
 # Or run as ComfyUI custom nodes (Phase 1, requires PyTorch host)
 cd ComfyUI && python main.py
 ```
 
-Open `http://localhost:8188` — the ComfyUI frontend connects directly.
+Open `http://localhost:11443` — the ComfyUI frontend connects directly.
 
 ## Architecture
 

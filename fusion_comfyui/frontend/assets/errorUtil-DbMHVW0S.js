@@ -1,0 +1,2 @@
+import"./rolldown-runtime-DIIn1E2Q.js";function toError(e){if(e instanceof Error)return e;if(typeof e==`string`)return Error(e);if(e===void 0)return Error(`undefined`);try{let t=JSON.stringify(e);return Error(t??String(e))}catch{return Error(String(e))}}export{toError as t};
+//# sourceMappingURL=errorUtil-DbMHVW0S.js.map

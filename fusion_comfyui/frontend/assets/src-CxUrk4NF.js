@@ -1,0 +1,2 @@
+import"./rolldown-runtime-DIIn1E2Q.js";import{M as e,N as t}from"./vendor-other-ifjiCTHW.js";var n=e({extend:{classGroups:{"font-size":[`text-xxs`,`text-xxxs`]}}});function cn(...e){return n(t(e))}export{cn as t};
+//# sourceMappingURL=src-CxUrk4NF.js.map

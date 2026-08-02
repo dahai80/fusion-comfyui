@@ -1,0 +1,2 @@
+import"./rolldown-runtime-DIIn1E2Q.js";var e=null;function useTelemetry(){return e}function setTelemetryRegistry(t){e=t}export{useTelemetry as n,setTelemetryRegistry as t};
+//# sourceMappingURL=telemetry-B0ZwHBL8.js.map

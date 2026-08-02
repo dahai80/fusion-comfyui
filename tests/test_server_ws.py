@@ -24,7 +24,7 @@ class TestWSClientManagement:
     async def test_send_to_client(self):
         ws = MagicMock()
         ws.send_json = AsyncMock()
-        cid = register_client(ws, "send-test")
+        register_client(ws, "send-test")
         await send_to_client("send-test", {"type": "test"})
         ws.send_json.assert_called_once_with({"type": "test"})
         unregister_client("send-test")

@@ -1,6 +1,5 @@
 import logging
 from pathlib import Path
-from typing import Callable, Awaitable
 
 import mlx.core as mx
 
@@ -268,7 +267,7 @@ class FusionImageToVideo(BaseNode):
 
     @classmethod
     def INPUT_TYPES(cls):
-        video_models = _get_video_models()
+        _get_video_models()
         return {
             "required": {
                 "model": ("MODEL",),

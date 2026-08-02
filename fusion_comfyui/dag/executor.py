@@ -78,7 +78,7 @@ def _parse_frontend_workflow(data: dict) -> Workflow:
 
 def _extract_frontend_inputs(node_data: dict, links_list: list) -> dict:
     inputs = {}
-    nid = node_data.get("id")
+    node_data.get("id")
     # Linked inputs from node's "inputs" array
     for inp in node_data.get("inputs", []):
         link_id = inp.get("link")

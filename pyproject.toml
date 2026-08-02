@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "fusion-comfyui"
+version = "0.2.0"
+description = "Pure MLX ComfyUI server on Apple Silicon — no PyTorch runtime"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+authors = [
+    {name = "dahai80"},
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "mlx>=0.22.0",
+    "fusion-mlx>=0.4.8",
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.29.0",
+    "websockets>=12.0",
+    "pillow>=10.0",
+    "imageio>=2.34",
+    "imageio-ffmpeg>=0.4.9",
+    "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.4",
+]
+
+[project.urls]
+Homepage = "https://github.com/dahai80/fusion-comfyui"
+Repository = "https://github.com/dahai80/fusion-comfyui"
+Issues = "https://github.com/dahai80/fusion-comfyui/issues"
+
+[project.scripts]
+fusion-comfyui = "fusion_comfyui.main:main"
+
+[tool.setuptools.packages.find]
+include = ["fusion_comfyui*"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "T", "N805", "S307", "S102"]
+ignore = ["E501", "E722", "E731", "E712", "E402", "E741"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

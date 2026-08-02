@@ -1,0 +1,52 @@
+# Non-code markdown files (kept local)
+CLAUDE.md
+CONSTRUCTION_PLAN.md
+BUILD_PLAN.md
+XIYOUJI_PIPELINE_PLAN.md
+architect.md
+example_bench.md
+plan.md
+
+# Upstream sub-repos (cloned separately)
+ComfyUI/
+ComfyUI_examples/
+ComfyUI_InstantID/
+ComfyUI_IPAdapter_plus/
+ComfyUI_TiledIPAdapter/
+comfyui-anima-ipadapter/
+ComfyUI-IPAdapter-Flux/
+ComfyUI-Workflows-ZHO/
+Diffusers_IPAdapter/
+IPAdapterWAN/
+LatentSync/
+LiveTalking/
+MuseTalk/
+PuLID/
+PuLID_ComfyUI/
+f5-tts-mlx/
+mlx-audio/
+ComfyKit/
+
+# Build artifacts
+__pycache__/
+*.pyc
+*.pyo
+.build/
+FusionComfyUI.app/
+
+# Runtime output
+output/
+
+# IDE / tooling
+.claude/
+.remember/
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Debug logs
+pytestdebug.log

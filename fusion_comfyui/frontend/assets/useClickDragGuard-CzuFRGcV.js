@@ -1,0 +1,2 @@
+import"./rolldown-runtime-DIIn1E2Q.js";function squaredDistance(e,t){let n=e.x-t.x,r=e.y-t.y;return n*n+r*r}function exceedsClickThreshold(e,t,n){return squaredDistance(e,t)>n*n}function useClickDragGuard(e=5){let t=null;function recordStart(e){t={x:e.clientX,y:e.clientY}}function wasDragged(n){return t?exceedsClickThreshold(t,{x:n.clientX,y:n.clientY},e):!1}function reset(){t=null}return{recordStart,wasDragged,reset}}export{useClickDragGuard as n,exceedsClickThreshold as t};
+//# sourceMappingURL=useClickDragGuard-CzuFRGcV.js.map

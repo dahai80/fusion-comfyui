@@ -1,0 +1,8 @@
+import"./rolldown-runtime-DIIn1E2Q.js";import{o as e,ot as t}from"./vendor-primevue-B5RSM0_L.js";import{A as n,B as r,N as i,R as a,Wt as o,Y as s,ht as c,nt as l,w as u,yt as d,zt as f}from"./vendor-vue-core-YYGrZyUu.js";import{a as p}from"./dialogService-CVq-DX47.js";import{t as m}from"./toastStore-VTOcZeBz.js";var h={class:`flex items-center gap-2`},g=r({__name:`GlobalToast`,setup(r){let g=t(),_=m(),v=p();c(()=>_.messagesToAdd,e=>{e.length!==0&&(e.forEach(e=>{g.add(e)}),_.messagesToAdd=[])},{deep:!0}),c(()=>_.messagesToRemove,e=>{e.length!==0&&(e.forEach(e=>{g.remove(e)}),_.messagesToRemove=[])},{deep:!0}),c(()=>_.removeAllRequested,e=>{e&&(g.removeAllGroups(),_.removeAllRequested=!1)});function updateToastPosition(){let e=document.getElementById(`dynamic-toast-style`)||createStyleElement(),t=document.querySelector(`.graph-canvas-container`)?.getBoundingClientRect();t&&(e.textContent=`
+    .p-toast.p-component.p-toast-top-right {
+      top: ${t.top+100}px !important;
+      right: ${window.innerWidth-(t.left+t.width)+20}px !important;
+       z-index: 10000 !important;
+    }
+  `)}function createStyleElement(){let e=document.createElement(`style`);return e.id=`dynamic-toast-style`,document.head.appendChild(e),e}return c(()=>v.get(`Comfy.UseNewMenu`),()=>s(updateToastPosition),{immediate:!0}),c(()=>v.get(`Comfy.Sidebar.Location`),()=>s(updateToastPosition),{immediate:!0}),(t,r)=>(l(),i(u,null,[a(f(e)),a(f(e),{group:`billing-operation`,position:`top-right`},{message:d(e=>[n(`div`,h,[r[0]||=n(`i`,{class:`pi pi-spin pi-spinner text-primary`},null,-1),n(`span`,null,o(e.message.summary),1)])]),_:1})],64))}});export{g as t};
+//# sourceMappingURL=GlobalToast-C-rTyO8C.js.map

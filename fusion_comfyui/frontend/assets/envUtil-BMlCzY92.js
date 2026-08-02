@@ -1,0 +1,2 @@
+import"./rolldown-runtime-DIIn1E2Q.js";import{n as e}from"./types-Btv0n5Jk.js";function electronAPI(){return window.electronAPI}function showNativeSystemMenu(){electronAPI()?.showContextMenu()}function isNativeWindow(){return e&&!!window.navigator.windowControlsOverlay?.visible}export{isNativeWindow as n,showNativeSystemMenu as r,electronAPI as t};
+//# sourceMappingURL=envUtil-BMlCzY92.js.map

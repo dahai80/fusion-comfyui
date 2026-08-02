@@ -21,7 +21,6 @@ from fusion_comfyui.server.protocol import (
     get_settings,
     get_extensions,
     system_stats,
-    check_interrupt,
 )
 from fusion_comfyui.server.ws import websocket_handler, send_to_client
 from fusion_comfyui.server.static_files import (

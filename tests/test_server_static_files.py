@@ -1,6 +1,5 @@
 import pytest
 from pathlib import Path
-from unittest.mock import patch
 
 from fusion_comfyui.server.static_files import (
     init_output_dir, get_output_dir, get_frontend_dir, view_file,

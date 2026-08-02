@@ -78,7 +78,6 @@ class FusionLipSync(BaseNode):
 
     async def _run_musetalk(self, video_path, audio_path, output_path, model_dir):
         import subprocess
-        import numpy as np
 
         from fusion_mlx.video.musetalk_mlx import MuseTalkPipeline
 

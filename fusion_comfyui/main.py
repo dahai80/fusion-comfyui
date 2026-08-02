@@ -9,8 +9,8 @@ import uvicorn
 def main():
     parser = argparse.ArgumentParser(description="fusion-comfyui: pure MLX ComfyUI server")
     parser.add_argument("command", nargs="?", default="serve", choices=["serve"], help="Command to run")
-    parser.add_argument("--host", default="0.0.0.0", help="Bind host")
-    parser.add_argument("--port", type=int, default=8188, help="Bind port")
+    parser.add_argument("--host", default="127.0.0.1", help="Bind host")
+    parser.add_argument("--port", type=int, default=11443, help="Bind port")
     parser.add_argument("--output-dir", default="output", help="Output directory")
     parser.add_argument("--log-level", default="info", choices=["debug", "info", "warning", "error"])
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload")

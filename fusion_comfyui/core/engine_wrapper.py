@@ -313,7 +313,7 @@ class FusionEngineWrapper:
     async def _fallback_generate(self, latent, positive, negative, steps, cfg, seed, **kwargs):
         logger.info("fallback: using monolithic generate() for %s", self.model_name)
         prompt = positive.get("prompt", "") if isinstance(positive, dict) else ""
-        neg_prompt = negative.get("negative_prompt", "") if isinstance(negative, dict) else ""
+        negative.get("negative_prompt", "") if isinstance(negative, dict) else ""
         if self.model_type == "image":
             width = kwargs.get("width", 1024)
             height = kwargs.get("height", 1024)

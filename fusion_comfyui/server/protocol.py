@@ -6,7 +6,7 @@ from fastapi import HTTPException, UploadFile, File, Form
 from fastapi.responses import JSONResponse
 
 from fusion_comfyui.dag.executor import parse_workflow
-from fusion_comfyui.nodes.registry import build_node_info, set_global_step_callback
+from fusion_comfyui.nodes.registry import build_node_info
 
 logger = logging.getLogger("fusion_comfyui.server.protocol")
 

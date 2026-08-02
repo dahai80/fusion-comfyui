@@ -1,6 +1,5 @@
 import logging
 import os
-import tempfile
 
 from fusion_comfyui.nodes.base import BaseNode
 from fusion_comfyui.core.timer import NodeTimer

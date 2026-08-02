@@ -167,6 +167,6 @@ class TestDAGExecutor:
         async def cb(step, total, nid, ntype):
             progress.append((step, total, nid))
 
-        result = await executor.execute(wf, progress_cb=cb)
+        await executor.execute(wf, progress_cb=cb)
         assert len(progress) == 1
         assert progress[0] == (1, 1, "1")

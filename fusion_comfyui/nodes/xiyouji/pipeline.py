@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import os
 import sys
@@ -7,10 +6,7 @@ import sys
 from fusion_comfyui.core.timer import NodeTimer
 from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper, unload_all_fusion_engines
 from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
-from fusion_comfyui.nodes.xiyouji.pulid import PuLIDIdentityExtract, PuLIDConditioningApply, PuLIDClearID
 from fusion_comfyui.nodes.xiyouji.vlm import XiyoujiChapterParser
-from fusion_comfyui.nodes.xiyouji.tts import FusionTTS
-from fusion_comfyui.nodes.xiyouji.lipsync import FusionLipSync
 from fusion_comfyui.nodes.xiyouji.assemble import SceneVideoAssembler, ChapterVideoConcat
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -51,7 +47,6 @@ async def run_chapter(chapter_text: str, chapter_title: str = "chapter"):
 
     # Phase 2: Pre-compute character identity embeddings
     logger.info("[Phase 2] Pre-computing character identity embeddings...")
-    id_cache = {}
     pulid_model_dir = os.environ.get("PULID_MODEL_DIR", "")
     skip_pulid = not bool(pulid_model_dir)
     if skip_pulid:
@@ -68,9 +63,9 @@ async def run_chapter(chapter_text: str, chapter_title: str = "chapter"):
         scene_id = int(scene.get("scene_id", idx + 1))
         desc_en = scene.get("description_en", "")
         desc_cn = scene.get("description_cn", "")
-        characters = scene.get("characters", [])
-        dialogue = scene.get("dialogue", [])
-        duration = float(scene.get("duration_seconds", 5))
+        scene.get("characters", [])
+        scene.get("dialogue", [])
+        float(scene.get("duration_seconds", 5))
 
         logger.info("[Phase 3] Scene %d: %s", scene_id, desc_cn[:60])
 

@@ -1,6 +1,7 @@
 import io
 import logging
 import os
+import tempfile
 
 import cv2
 import mlx.core as mx
@@ -258,25 +259,46 @@ class FusionImageToVideoNode:
                              steps, cfg, seed):
         await pipeline.ensure_started()
         neg = negative_prompt if negative_prompt else None
+        image_input = control_image
+        tmp_path = None
+        if isinstance(control_image, Image.Image):
+            tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+            try:
+                control_image.save(tmp, format="PNG")
+                tmp.close()
+                tmp_path = tmp.name
+                image_input = tmp_path
+                logger.info("_generate_i2v: saved PIL Image to temp file %s", tmp_path)
+            except Exception:
+                tmp.close()
+                os.unlink(tmp.name)
+                raise
         try:
             result_raw = await pipeline._engine.generate(
                 prompt=prompt, num_frames=num_frames, width=width, height=height,
                 fps=fps, seed=seed, n=1, num_inference_steps=steps,
                 cfg_scale=cfg, negative_prompt=neg,
-                image=control_image, output_format="raw",
+                image=image_input, output_format="raw",
             )
             if isinstance(result_raw[0], np.ndarray):
                 logger.info("_generate_i2v: raw frames shape=%s", result_raw[0].shape)
                 return result_raw
         except (TypeError, AttributeError) as e:
             logger.info("_generate_i2v: raw not supported, falling back to mp4: %s", e)
-        result_bytes = await pipeline._engine.generate(
-            prompt=prompt, num_frames=num_frames, width=width, height=height,
-            fps=fps, seed=seed, n=1, num_inference_steps=steps,
-            cfg_scale=cfg, negative_prompt=neg,
-            image=control_image,
-        )
-        return result_bytes
+        try:
+            result_bytes = await pipeline._engine.generate(
+                prompt=prompt, num_frames=num_frames, width=width, height=height,
+                fps=fps, seed=seed, n=1, num_inference_steps=steps,
+                cfg_scale=cfg, negative_prompt=neg,
+                image=image_input,
+            )
+            return result_bytes
+        finally:
+            if tmp_path:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
 
 
 def _image_to_bgr(image_np: np.ndarray) -> np.ndarray:

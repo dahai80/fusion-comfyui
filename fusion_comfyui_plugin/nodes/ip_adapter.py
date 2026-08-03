@@ -204,10 +204,13 @@ class IPAFluxAttnProcessor(nn.Module):
         if self._image_embeds is None:
             return None
 
+        range_mask = None
         if self.timestep_range is not None and t_sigma is not None:
-            t_val = float(t_sigma)
-            if t_val > self.timestep_range[0] or t_val < self.timestep_range[1]:
-                return None
+            if not isinstance(t_sigma, _mx.array):
+                t_sigma = _mx.array(t_sigma, dtype=hidden_states.dtype)
+            t_start = _mx.array(self.timestep_range[0], dtype=hidden_states.dtype)
+            t_end = _mx.array(self.timestep_range[1], dtype=hidden_states.dtype)
+            range_mask = ((t_sigma <= t_start) & (t_sigma >= t_end)).astype(hidden_states.dtype)
 
         num_heads = self.hidden_size // 128
         head_dim = 128
@@ -229,7 +232,10 @@ class IPAFluxAttnProcessor(nn.Module):
         attn_out = mx.fast.scaled_dot_product_attention(query, ip_k, ip_v, scale=scale)
         attn_out = attn_out.transpose(0, 2, 1, 3).reshape(B, seq_len, self.hidden_size)
 
-        return attn_out * self.scale
+        result = attn_out * self.scale
+        if range_mask is not None:
+            result = result * range_mask
+        return result
 
 
 def _remap_siglip_weights(weights):
@@ -633,7 +639,7 @@ class FluxIPAdapterPipeline:
             if timestep.ndim == 0:
                 timestep = _mx.full((hidden_states.shape[0],), timestep, dtype=hidden_states.dtype)
             timestep = timestep.astype(hidden_states.dtype)
-            _t_sigma = float(_mx.max(timestep))
+            _t_sigma = _mx.max(timestep)
             timestep_scale = _mx.where(_mx.max(timestep) <= 1.0, 1000.0, 1.0).astype(hidden_states.dtype)
             timestep = timestep * timestep_scale
             if guidance is not None:

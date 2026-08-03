@@ -21,7 +21,7 @@ logger = logging.getLogger("test_e2e_workflows")
 
 COMFYUI_URL = "http://127.0.0.1:11443"
 POLL_INTERVAL = 5
-MAX_POLL_SECONDS = 600
+MAX_POLL_SECONDS = 1200
 
 
 def _api_get(path):
@@ -174,6 +174,122 @@ def _build_image_shortcut(model_name, prompt, width, height, steps, cfg, seed, p
     }
 
 
+# ─── i2v: LoadImage → ModelLoader → ImageToVideo → SaveVideo ─────
+
+
+def _build_i2v_shortcut(model_name, source_image, prompt, width, height,
+                         num_frames, steps, cfg, seed, prefix):
+    return {
+        "1": {
+            "class_type": "LoadImage",
+            "inputs": {
+                "image": source_image,
+            },
+        },
+        "2": {
+            "class_type": "FusionModelLoader",
+            "inputs": {
+                "model_name": model_name,
+                "offload_strategy": "sequential",
+                "quant_bit": "fp8_e4m3",
+            },
+        },
+        "3": {
+            "class_type": "FusionImageToVideo",
+            "inputs": {
+                "pipeline": ["2", 0],
+                "image": ["1", 0],
+                "prompt": prompt,
+                "negative_prompt": "",
+                "width": width,
+                "height": height,
+                "num_frames": num_frames,
+                "fps": 16,
+                "steps": steps,
+                "cfg": cfg,
+                "seed": seed,
+            },
+        },
+        "4": {
+            "class_type": "FusionSaveVideo",
+            "inputs": {
+                "images": ["3", 0],
+                "filename_prefix": prefix,
+                "fps": 16,
+                "codec": "libx264",
+                "crf": 18,
+            },
+        },
+    }
+
+
+# ─── ip-adapter: LoadImage → IPAdapterLoader → IPAdapterApply →
+#       ModelLoader → IPAdapterInject → SaveVideo ────────────────────
+
+
+def _build_ipadapter_flux(model_name, source_image, ipadapter_file, prompt,
+                           width, height, steps, cfg, seed, prefix):
+    return {
+        "1": {
+            "class_type": "LoadImage",
+            "inputs": {
+                "image": source_image,
+            },
+        },
+        "2": {
+            "class_type": "FusionIPAdapterLoader",
+            "inputs": {
+                "ipadapter": ipadapter_file,
+                "siglip_model": "siglip-so400m-patch14-384",
+                "num_tokens": 128,
+                "dtype": "float16",
+            },
+        },
+        "3": {
+            "class_type": "FusionIPAdapterApply",
+            "inputs": {
+                "ip_adapter_model": ["2", 0],
+                "image": ["1", 0],
+                "weight": 1.0,
+                "start_percent": 0.0,
+                "end_percent": 1.0,
+            },
+        },
+        "4": {
+            "class_type": "FusionModelLoader",
+            "inputs": {
+                "model_name": model_name,
+                "offload_strategy": "sequential",
+                "quant_bit": "fp8_e4m3",
+            },
+        },
+        "5": {
+            "class_type": "FusionIPAdapterInject",
+            "inputs": {
+                "pipeline": ["4", 0],
+                "ip_adapter_embed": ["3", 0],
+                "prompt": prompt,
+                "negative_prompt": "",
+                "width": width,
+                "height": height,
+                "steps": steps,
+                "cfg": cfg,
+                "seed": seed,
+            },
+        },
+        "6": {
+            "class_type": "FusionSaveVideo",
+            "inputs": {
+                "images": ["5", 0],
+                "filename_prefix": prefix,
+                "fps": 24,
+                "codec": "libx264",
+                "crf": 18,
+            },
+        },
+    }
+
+
 # ─── Test cases ───────────────────────────────────────────────────
 
 
@@ -244,6 +360,33 @@ class TestFluxImage:
             prompt="A beautiful sunset over mountains, masterpiece",
             width=1024, height=1024,
             steps=10, cfg=3.5, seed=42, prefix="e2e_flux_image",
+        )
+        outputs = _submit_workflow(wf)
+        _verify_output(outputs)
+
+
+class TestWan22I2V:
+    def test_14b_i2v(self):
+        wf = _build_i2v_shortcut(
+            model_name="wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+            source_image="sunset.png",
+            prompt="The sun sets over the ocean, waves gently lapping, cinematic",
+            width=768, height=480, num_frames=33,
+            steps=10, cfg=5.0, seed=42, prefix="e2e_wan22_14b_i2v",
+        )
+        outputs = _submit_workflow(wf)
+        _verify_output(outputs)
+
+
+class TestIPAdapterFlux:
+    def test_ipadapter_flux(self):
+        wf = _build_ipadapter_flux(
+            model_name="flux2-klein-4b.safetensors",
+            source_image="sunset.png",
+            ipadapter_file="ip_adapter_flux.safetensors",
+            prompt="A beautiful landscape with sunset colors",
+            width=1024, height=1024,
+            steps=10, cfg=4.0, seed=42, prefix="e2e_ipadapter_flux",
         )
         outputs = _submit_workflow(wf)
         _verify_output(outputs)

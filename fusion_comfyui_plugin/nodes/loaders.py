@@ -274,11 +274,17 @@ class FusionModelLoaderNode:
     CATEGORY = "Fusion-MLX/Loaders"
 
     def load_pipeline(self, model_name, offload_strategy, quant_bit):
+        from core.wrappers import _map_unet_name_to_model_name, _resolve_model_path
         from core.engine_wrapper import FusionEngineWrapper
+        resolved_name = _map_unet_name_to_model_name(model_name)
+        resolved_path = _resolve_model_path(resolved_name)
         pipeline = FusionEngineWrapper(
-            model_name=model_name,
+            model_name=resolved_path,
             offload_strategy=offload_strategy,
             quant_bit=quant_bit,
         )
-        logger.info("FusionModelLoader: model=%s offload=%s quant=%s", model_name, offload_strategy, quant_bit)
+        logger.info(
+            "FusionModelLoader: model=%s -> resolved=%s path=%s offload=%s quant=%s",
+            model_name, resolved_name, resolved_path, offload_strategy, quant_bit,
+        )
         return (pipeline,)

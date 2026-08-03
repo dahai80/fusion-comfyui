@@ -1,5 +1,7 @@
 # fusion-comfyui
 
+**English** | [中文](README_CN.md)
+
 Pure MLX ComfyUI server on Apple Silicon. Zero PyTorch at runtime.
 
 Built on [fusion-mlx](https://github.com/dahai80/fusion-mlx) engine — FLUX.2, Wan2.2, SkyReels-V3, LTX-2 image/video generation via Metal/MLX.

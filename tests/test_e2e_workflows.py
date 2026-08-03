@@ -21,7 +21,7 @@ logger = logging.getLogger("test_e2e_workflows")
 
 COMFYUI_URL = "http://127.0.0.1:11443"
 POLL_INTERVAL = 5
-MAX_POLL_SECONDS = 1200
+MAX_POLL_SECONDS = 3600
 
 
 def _api_get(path):

@@ -139,7 +139,7 @@ class FusionVideoGenNode:
             video_result = core.async_utils.run_async(
                 self._generate_video(pipeline, prompt, negative_prompt,
                                      width, height, num_frames, fps, steps, cfg, seed),
-                timeout=1200,
+                timeout=3600,
             )
         except Exception as e:
             logger.error("FusionVideoGen: failed: %s", e)
@@ -150,8 +150,13 @@ class FusionVideoGenNode:
             frames_np = raw.astype(np.float32) / 255.0
             if frames_np.ndim == 4 and frames_np.shape[3] == 3:
                 frames_np = frames_np[np.newaxis, ...]
-        else:
+        elif isinstance(video_result[0], (bytes, bytearray)):
+            frames_np = _video_bytes_to_frame_array(video_result[0])
+        elif isinstance(video_result, (bytes, bytearray)):
             frames_np = _video_bytes_to_frame_array(video_result)
+        else:
+            logger.warning("FusionVideoGen: unexpected result type=%s", type(video_result))
+            frames_np = _video_bytes_to_frame_array(bytes(video_result[0]) if video_result else b"")
         logger.info("FusionVideoGen: output shape=%s", frames_np.shape)
         return (frames_np,)
 
@@ -219,7 +224,7 @@ class FusionImageToVideoNode:
                 self._generate_i2v(pipeline, control_image, prompt,
                                    negative_prompt, width, height,
                                    num_frames, fps, steps, cfg, seed),
-                timeout=1200,
+                timeout=3600,
             )
         except Exception as e:
             logger.error("FusionI2V: failed: %s", e)
@@ -230,8 +235,13 @@ class FusionImageToVideoNode:
             frames_np = raw.astype(np.float32) / 255.0
             if frames_np.ndim == 4 and frames_np.shape[3] == 3:
                 frames_np = frames_np[np.newaxis, ...]
-        else:
+        elif isinstance(video_result[0], (bytes, bytearray)):
+            frames_np = _video_bytes_to_frame_array(video_result[0])
+        elif isinstance(video_result, (bytes, bytearray)):
             frames_np = _video_bytes_to_frame_array(video_result)
+        else:
+            logger.warning("FusionI2V: unexpected result type=%s", type(video_result))
+            frames_np = _video_bytes_to_frame_array(bytes(video_result[0]) if video_result else b"")
         logger.info("FusionI2V: output shape=%s", frames_np.shape)
         return (frames_np,)
 

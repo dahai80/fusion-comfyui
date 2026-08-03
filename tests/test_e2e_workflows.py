@@ -294,6 +294,10 @@ def _build_ipadapter_flux(model_name, source_image, ipadapter_file, prompt,
 
 
 class TestHunyuanVideo:
+    @pytest.mark.xfail(
+        reason="fusion-mlx #15: VAE/DiT/TextEncoder architectures don't match official weights (0/184+890+536 params loaded); produces all-black output",
+        strict=True,
+    )
     def test_t2v(self):
         wf = _build_t2v_shortcut(
             model_name="hunyuan_video_t2v_720p_bf16.safetensors",
@@ -330,6 +334,10 @@ class TestWan22:
 
 
 class TestCosmos:
+    @pytest.mark.xfail(
+        reason="fusion-mlx #16: DiT/VAE architectures don't match official weights (0/626 params loaded) + zero text embeddings; produces all-black output or OOM crash",
+        strict=True,
+    )
     def test_t2v(self):
         wf = _build_t2v_shortcut(
             model_name="Cosmos-1_0-Diffusion-7B-Text2World.safetensors",

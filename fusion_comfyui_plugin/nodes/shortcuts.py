@@ -41,6 +41,25 @@ def _video_bytes_to_frame_array(video_bytes: bytes) -> np.ndarray:
     return np.stack(frames, axis=0)
 
 
+def _video_result_to_frames(video_result, label: str) -> np.ndarray:
+    if isinstance(video_result[0], np.ndarray):
+        raw = video_result[0]
+        frames_np = raw.astype(np.float32) / 255.0
+        if frames_np.ndim == 3 and frames_np.shape[2] == 3:
+            frames_np = frames_np[np.newaxis, ...]
+        logger.info("%s: raw ndarray path, shape=%s", label, frames_np.shape)
+    elif isinstance(video_result[0], (bytes, bytearray)):
+        frames_np = _video_bytes_to_frame_array(video_result[0])
+    elif isinstance(video_result, (bytes, bytearray)):
+        frames_np = _video_bytes_to_frame_array(video_result)
+    else:
+        logger.warning("%s: unexpected result type=%s", label, type(video_result))
+        frames_np = _video_bytes_to_frame_array(
+            bytes(video_result[0]) if video_result else b""
+        )
+    return frames_np
+
+
 class FusionImageGenNode:
     @classmethod
     def INPUT_TYPES(cls):
@@ -145,18 +164,7 @@ class FusionVideoGenNode:
             logger.error("FusionVideoGen: failed: %s", e)
             raise
 
-        if isinstance(video_result[0], np.ndarray):
-            raw = video_result[0]
-            frames_np = raw.astype(np.float32) / 255.0
-            if frames_np.ndim == 4 and frames_np.shape[3] == 3:
-                frames_np = frames_np[np.newaxis, ...]
-        elif isinstance(video_result[0], (bytes, bytearray)):
-            frames_np = _video_bytes_to_frame_array(video_result[0])
-        elif isinstance(video_result, (bytes, bytearray)):
-            frames_np = _video_bytes_to_frame_array(video_result)
-        else:
-            logger.warning("FusionVideoGen: unexpected result type=%s", type(video_result))
-            frames_np = _video_bytes_to_frame_array(bytes(video_result[0]) if video_result else b"")
+        frames_np = _video_result_to_frames(video_result, "FusionVideoGen")
         logger.info("FusionVideoGen: output shape=%s", frames_np.shape)
         return (frames_np,)
 
@@ -173,6 +181,11 @@ class FusionVideoGenNode:
             if isinstance(result_raw[0], np.ndarray):
                 logger.info("_generate_video: raw frames shape=%s", result_raw[0].shape)
                 return result_raw
+            logger.info(
+                "_generate_video: raw not returned (got %s), using as mp4",
+                type(result_raw[0]).__name__,
+            )
+            return result_raw
         except (TypeError, AttributeError) as e:
             logger.info("_generate_video: raw not supported, falling back to mp4: %s", e)
         result_bytes = await pipeline._engine.generate(
@@ -230,18 +243,7 @@ class FusionImageToVideoNode:
             logger.error("FusionI2V: failed: %s", e)
             raise
 
-        if isinstance(video_result[0], np.ndarray):
-            raw = video_result[0]
-            frames_np = raw.astype(np.float32) / 255.0
-            if frames_np.ndim == 4 and frames_np.shape[3] == 3:
-                frames_np = frames_np[np.newaxis, ...]
-        elif isinstance(video_result[0], (bytes, bytearray)):
-            frames_np = _video_bytes_to_frame_array(video_result[0])
-        elif isinstance(video_result, (bytes, bytearray)):
-            frames_np = _video_bytes_to_frame_array(video_result)
-        else:
-            logger.warning("FusionI2V: unexpected result type=%s", type(video_result))
-            frames_np = _video_bytes_to_frame_array(bytes(video_result[0]) if video_result else b"")
+        frames_np = _video_result_to_frames(video_result, "FusionI2V")
         logger.info("FusionI2V: output shape=%s", frames_np.shape)
         return (frames_np,)
 
@@ -293,6 +295,11 @@ class FusionImageToVideoNode:
             if isinstance(result_raw[0], np.ndarray):
                 logger.info("_generate_i2v: raw frames shape=%s", result_raw[0].shape)
                 return result_raw
+            logger.info(
+                "_generate_i2v: raw not returned (got %s), using as mp4",
+                type(result_raw[0]).__name__,
+            )
+            return result_raw
         except (TypeError, AttributeError) as e:
             logger.info("_generate_i2v: raw not supported, falling back to mp4: %s", e)
         try:

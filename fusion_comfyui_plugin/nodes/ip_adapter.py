@@ -206,6 +206,13 @@ class IPAFluxAttnProcessor(nn.Module):
 
         range_mask = None
         if self.timestep_range is not None and t_sigma is not None:
+            t_start_r, t_end_r = self.timestep_range
+            if isinstance(t_sigma, (int, float)) and not (t_end_r <= t_sigma <= t_start_r):
+                logger.debug(
+                    "IP-Adapter skipped: t_sigma=%s outside range [%s, %s]",
+                    t_sigma, t_end_r, t_start_r,
+                )
+                return None
             _mx = mx
             if not isinstance(t_sigma, _mx.array):
                 t_sigma = _mx.array(t_sigma, dtype=hidden_states.dtype)

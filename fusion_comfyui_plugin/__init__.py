@@ -113,6 +113,7 @@ from .nodes.ip_adapter import (
     FusionIPAdapterApply,
     FusionIPAdapterInject,
 )
+from .nodes.stats import FusionDenoiseStatsNode
 
 FusionMemoryGuardian.setup_environment()
 logger.info("ComfyUI-Fusion-MLX: memory guardian initialized")
@@ -207,6 +208,8 @@ NODE_CLASS_MAPPINGS = {
     "FusionIPAdapterLoader": FusionIPAdapterLoader,
     "FusionIPAdapterApply": FusionIPAdapterApply,
     "FusionIPAdapterInject": FusionIPAdapterInject,
+    # Debug
+    "FusionDenoiseStats": FusionDenoiseStatsNode,
 }
 
 # ComfyUI's load_custom_node() filters native node names via `ignore` param,
@@ -363,6 +366,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "FusionIPAdapterLoader": "⚡ Fusion-MLX IP-Adapter Loader",
     "FusionIPAdapterApply": "⚡ Fusion-MLX IP-Adapter Apply",
     "FusionIPAdapterInject": "⚡ Fusion-MLX IP-Adapter Inject",
+    # Debug
+    "FusionDenoiseStats": "⚡ Fusion-MLX Denoise Stats",
 }
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]

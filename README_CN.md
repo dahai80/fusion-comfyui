@@ -27,7 +27,7 @@ cd ComfyUI && python main.py
 |---|---|---|
 | Phase 1 | ✅ 已完成 | ComfyUI 自定义节点（PyTorch 宿主 + MLX 计算） |
 | Phase 2 | ✅ 已完成 | 独立 FastAPI 服务器，ComfyUI 协议，零 PyTorch |
-| Phase 3 | 🔧 进行中 | Radix 缓存 ✅，增强节点 ✅，spec denoise/NVFP4/async dispatch 需要 fusion-mlx 支持 |
+| Phase 3 | 🔧 进行中 | 推测去噪机制 ✅（已落地，默认关闭，加速已证伪），Radix 缓存 ✅，统计节点 ✅，NVFP4 受阻（mlx#2962），异步调度需 fusion-mlx |
 | Phase 4 | 🔧 进行中 | Swift 应用拆分 ✅，ServerManager/ModelManager ✅，需要打包 |
 
 详见 [CONSTRUCTION_PLAN.md](CONSTRUCTION_PLAN.md)。
@@ -76,22 +76,28 @@ FusionComfyUI/           # Phase 4 macOS 原生应用（Swift）
 
 ## Phase 3 配置
 
-Phase 3 功能通过环境变量控制（需要 fusion-mlx 支持）：
+Phase 3 功能通过环境变量控制。推测去噪机制已在 fusion-mlx 落地（环境变量门控，默认关闭）；Radix 缓存为本地实现；NVFP4 受上游阻塞（见下）。
 
 ```bash
-# 推测去噪
-FUSION_SPECULATIVE_DENOISING=1
-FUSION_SPEC_DRAFT_STEPS=2
-FUSION_SPEC_DRAFT_MODEL=flux-schnell
+# 推测去噪（fusion-mlx 机制已落地，默认关闭）
+FUSION_SPECULATIVE_DENOISE=1
+FUSION_SPEC_K=4
+FUSION_SPEC_EPSILON=0.1
+FUSION_SPEC_DRAFT_BLOCKS=
+FUSION_SPEC_EVAL_STEPS=1
 
-# Radix KV 缓存
+# Radix KV 缓存（本地 RadixCache 已实现）
 FUSION_RADIX_CACHE_ENABLED=1
 FUSION_RADIX_CACHE_MAX_MB=512
 
-# NVFP4 权重加载
+# NVFP4 权重加载（受 MLX 框架 issue mlx#2962 阻塞）
 FUSION_NVFP4_ENABLED=1
 FUSION_NVFP4_THRESHOLD_GB=8
 ```
+
+去噪统计可在运行时查询：`FusionDenoiseStats` 节点（Phase 1 自定义节点与 Phase 2 注册表均支持）
+返回最近一次去噪的接受率/加速比计数（JSON），fusion-mlx 暴露
+`GET /v1/videos/denoise-stats?model=<name>`。
 
 ## 上游依赖
 
@@ -100,11 +106,11 @@ Phase 1 和 Phase 2 上游问题（已全部解决）：
 - [#171](https://github.com/dahai80/fusion-mlx/issues/171) — ✅ 流式进度回调（`StepCallback`）
 - [#172](https://github.com/dahai80/fusion-mlx/issues/172) — ✅ 模型注册 API（`list_available_models`）
 
-Phase 3 功能仍依赖未来 fusion-mlx 支持：
-- 推测去噪基础设施（草稿模型共加载 + 并行验证）
-- 扩散模型 Radix KV 缓存（前缀树 KV 缓存管理器 — 本地 RadixCache ✅ 已实现）
-- NVFP4 权重读取器（E2M1 + block scale 反量化）
-- Metal 异步调度管线（拆分命令缓冲区实现 CPU/GPU 重叠）
+Phase 3 状态（fusion-mlx 机制已落地）：
+- 推测去噪 ✅ 已在 fusion-mlx 落地（`speculative_denoise.py`：草稿预测 + 批量验证），环境变量门控、默认关闭。层剪枝草稿在 SkyReels-V3 R2V 14B 上经评估证伪（ε=0.1 时接受率 0%，无加速）——机制保留为未来蒸馏草稿的基础设施。统计面已上线：`GET /v1/videos/denoise-stats?model=<name>` + `FusionDenoiseStats` 节点。
+- Radix KV 缓存：本地 `RadixCache` ✅ 已实现（前缀树）；上游扩散 KV 复用仍属未来。
+- NVFP4 权重读取器：受 MLX 框架 issue [mlx#2962](https://github.com/ml-explore/mlx/issues/2962) 阻塞（非 fusion-mlx）。
+- Metal 异步调度管线：仍需 fusion-mlx（拆分命令缓冲区实现 CPU/GPU 重叠）。
 
 ## 系统要求
 

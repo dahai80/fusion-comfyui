@@ -206,6 +206,7 @@ class IPAFluxAttnProcessor(nn.Module):
 
         range_mask = None
         if self.timestep_range is not None and t_sigma is not None:
+            _mx = mx
             if not isinstance(t_sigma, _mx.array):
                 t_sigma = _mx.array(t_sigma, dtype=hidden_states.dtype)
             t_start = _mx.array(self.timestep_range[0], dtype=hidden_states.dtype)

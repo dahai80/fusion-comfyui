@@ -122,6 +122,18 @@ class FusionEngineWrapper:
             return False
         return getattr(self._engine, "_vae_loaded", False)
 
+    def last_denoise_stats(self) -> dict:
+        if not self._engine or not self._started:
+            return {"available": False, "enabled": False}
+        fn = getattr(self._engine, "last_denoise_stats", None)
+        if fn is None:
+            return {"available": False, "enabled": False}
+        try:
+            return fn()
+        except Exception as e:
+            logger.warning("last_denoise_stats failed: %s", e)
+            return {"available": False, "enabled": False, "error": str(e)}
+
     async def ensure_started(self):
         if self._started:
             return

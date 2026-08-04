@@ -330,10 +330,6 @@ class TestWan22:
 
 
 class TestCosmos:
-    @pytest.mark.xfail(
-        reason="fusion-mlx #16: DiT/VAE architectures don't match official weights (0/626 params loaded) + zero text embeddings; produces all-black output or OOM crash",
-        strict=True,
-    )
     def test_t2v(self):
         wf = _build_t2v_shortcut(
             model_name="Cosmos-1_0-Diffusion-7B-Text2World.safetensors",

@@ -5,8 +5,11 @@ from fusion_comfyui.core.config import Phase3Config, RadixCache, load_config
 class TestPhase3Config:
     def test_defaults(self):
         cfg = Phase3Config()
-        assert cfg.speculative_denoising is False
-        assert cfg.spec_draft_steps == 2
+        assert cfg.spec_denoise_enabled is False
+        assert cfg.spec_k == 4
+        assert cfg.spec_epsilon == 0.1
+        assert cfg.spec_draft_blocks == ""
+        assert cfg.spec_eval_steps == 1
         assert cfg.radix_cache_enabled is False
         assert cfg.radix_cache_max_mb == 512
         assert cfg.nvfp4_enabled is False
@@ -14,30 +17,41 @@ class TestPhase3Config:
     def test_to_dict(self):
         cfg = Phase3Config()
         d = cfg.to_dict()
-        assert "speculative_denoising" in d
+        assert "spec_denoise_enabled" in d
         assert "radix_cache_max_mb" in d
-        assert d["spec_draft_steps"] == 2
+        assert d["spec_k"] == 4
+        assert d["spec_epsilon"] == 0.1
+        assert d["spec_eval_steps"] == 1
 
     def test_load_config_defaults(self, monkeypatch):
         for key in [
-            "FUSION_SPECULATIVE_DENOISING", "FUSION_SPEC_DRAFT_STEPS",
-            "FUSION_SPEC_DRAFT_MODEL", "FUSION_RADIX_CACHE_ENABLED",
+            "FUSION_SPECULATIVE_DENOISE", "FUSION_SPEC_K",
+            "FUSION_SPEC_EPSILON", "FUSION_SPEC_DRAFT_BLOCKS",
+            "FUSION_SPEC_EVAL_STEPS", "FUSION_RADIX_CACHE_ENABLED",
             "FUSION_RADIX_CACHE_MAX_MB", "FUSION_NVFP4_ENABLED",
             "FUSION_NVFP4_THRESHOLD_GB",
         ]:
             monkeypatch.delenv(key, raising=False)
         cfg = load_config()
-        assert cfg.speculative_denoising is False
+        assert cfg.spec_denoise_enabled is False
+        assert cfg.spec_k == 4
+        assert cfg.spec_epsilon == 0.1
         assert cfg.radix_cache_max_mb == 512
 
     def test_load_config_env_override(self, monkeypatch):
         monkeypatch.setenv("FUSION_RADIX_CACHE_ENABLED", "1")
         monkeypatch.setenv("FUSION_RADIX_CACHE_MAX_MB", "1024")
         monkeypatch.setenv("FUSION_NVFP4_ENABLED", "true")
+        monkeypatch.setenv("FUSION_SPECULATIVE_DENOISE", "1")
+        monkeypatch.setenv("FUSION_SPEC_K", "8")
+        monkeypatch.setenv("FUSION_SPEC_EPSILON", "0.25")
         cfg = load_config()
         assert cfg.radix_cache_enabled is True
         assert cfg.radix_cache_max_mb == 1024
         assert cfg.nvfp4_enabled is True
+        assert cfg.spec_denoise_enabled is True
+        assert cfg.spec_k == 8
+        assert cfg.spec_epsilon == 0.25
 
 
 class TestRadixCache:

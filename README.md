@@ -27,7 +27,7 @@ Open `http://localhost:11443` — the ComfyUI frontend connects directly.
 |---|---|---|
 | Phase 1 | ✅ Complete | ComfyUI custom nodes (PyTorch host + MLX compute) |
 | Phase 2 | ✅ Complete | Standalone FastAPI server, ComfyUI protocol, zero PyTorch |
-| Phase 3 | 🔧 In Progress | Radix cache ✅, enhanced nodes ✅, spec denoise/NVFP4/async dispatch need fusion-mlx |
+| Phase 3 | 🔧 In Progress | Spec denoise machinery ✅ (landed, default-off, accel falsified), Radix cache ✅, stats node ✅, NVFP4 blocked (mlx#2962), async dispatch needs fusion-mlx |
 | Phase 4 | 🔧 In Progress | Swift app split ✅, ServerManager/ModelManager ✅, needs packaging |
 
 See [CONSTRUCTION_PLAN.md](CONSTRUCTION_PLAN.md) for full details.
@@ -76,22 +76,31 @@ FusionComfyUI/           # Phase 4 macOS native app (Swift)
 
 ## Phase 3 Configuration
 
-Phase 3 features are controlled via environment variables (require fusion-mlx support):
+Phase 3 features are controlled via environment variables. Speculative denoising
+machinery has landed in fusion-mlx (env-gated, default-off); radix cache is a
+local implementation; NVFP4 is blocked upstream (see below).
 
 ```bash
-# Speculative denoising
-FUSION_SPECULATIVE_DENOISING=1
-FUSION_SPEC_DRAFT_STEPS=2
-FUSION_SPEC_DRAFT_MODEL=flux-schnell
+# Speculative denoising (fusion-mlx machinery landed, default-off)
+FUSION_SPECULATIVE_DENOISE=1
+FUSION_SPEC_K=4
+FUSION_SPEC_EPSILON=0.1
+FUSION_SPEC_DRAFT_BLOCKS=
+FUSION_SPEC_EVAL_STEPS=1
 
-# Radix KV cache
+# Radix KV cache (local RadixCache implemented)
 FUSION_RADIX_CACHE_ENABLED=1
 FUSION_RADIX_CACHE_MAX_MB=512
 
-# NVFP4 weight ingestion
+# NVFP4 weight ingestion (blocked on MLX framework issue mlx#2962)
 FUSION_NVFP4_ENABLED=1
 FUSION_NVFP4_THRESHOLD_GB=8
 ```
+
+Denoise stats are queryable at runtime: the `FusionDenoiseStats` node (both
+Phase 1 custom nodes and Phase 2 registry) returns the last denoise run's
+acceptance/speedup counters as JSON, and fusion-mlx exposes
+`GET /v1/videos/denoise-stats?model=<name>`.
 
 ## Upstream Dependencies
 
@@ -100,11 +109,11 @@ Phase 1 and Phase 2 upstream issues (all resolved):
 - [#171](https://github.com/dahai80/fusion-mlx/issues/171) — ✅ Streaming progress callback (`StepCallback`)
 - [#172](https://github.com/dahai80/fusion-mlx/issues/172) — ✅ Model registry API (`list_available_models`)
 
-Phase 3 features still depend on future fusion-mlx support:
-- Speculative denoising infrastructure (draft model co-loading + parallel verify)
-- Radix KV cache for diffusion models (prefix-tree KV cache manager — local RadixCache ✅ implemented)
-- NVFP4 weight reader (E2M1 + block scale dequant)
-- Metal async dispatch pipeline (split command buffer for CPU/GPU overlap)
+Phase 3 status (fusion-mlx machinery landed):
+- Speculative denoising ✅ landed in fusion-mlx (`speculative_denoise.py`: draft-predict + batched-verify), env-gated and default-off. The layer-pruned draft was evaluated and FALSIFIED on SkyReels-V3 R2V 14B (0% acceptance at ε=0.1, no speedup) - machinery stays as infrastructure for a future distilled draft. Stats surface is live: `GET /v1/videos/denoise-stats?model=<name>` + `FusionDenoiseStats` node.
+- Radix KV cache: local `RadixCache` implemented (prefix-tree); upstream diffusion KV reuse still future.
+- NVFP4 weight reader: blocked on MLX framework issue [mlx#2962](https://github.com/ml-explore/mlx/issues/2962) (not fusion-mlx).
+- Metal async dispatch pipeline: still needs fusion-mlx (split command buffer for CPU/GPU overlap).
 
 HunyuanVideo MLX rewrite (all weight-matched, upstream [#15](https://github.com/dahai80/fusion-mlx/issues/15)):
 VAE 248/248, DiT 856/856, TextEncoder CLIP-L 196/196 + Llama3-8B 290/290; real tokenizers added; e2e t2v verified.

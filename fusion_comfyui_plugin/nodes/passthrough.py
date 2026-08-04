@@ -320,8 +320,23 @@ class CosmosImageToVideoLatent:
 
     def generate(self, vae, width=1280, height=704, length=121, batch_size=1, start_image=None, end_image=None):
         latent = mx.zeros((batch_size, 16, (length - 1) // 8 + 1, height // 8, width // 8), dtype=mx.float32)
+        result = {"samples": latent, "num_frames": length, "width": width, "height": height}
+        if start_image is not None:
+            import tempfile
+            from PIL import Image as PILImage
+            img_arr = start_image
+            if isinstance(img_arr, mx.array):
+                img_arr = np.array(img_arr)
+            if img_arr.ndim == 4:
+                img_arr = img_arr[0]
+            pil_img = PILImage.fromarray((np.clip(img_arr, 0, 1) * 255).astype(np.uint8))
+            tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False, prefix="fusion_cosmos_i2v_")
+            pil_img.save(tmp.name)
+            tmp.close()
+            result["_i2v_image_path"] = tmp.name
+            logger.info("CosmosImageToVideoLatent: saved start_image to %s for i2v", tmp.name)
         logger.info("CosmosImageToVideoLatent: shape=%s start=%s end=%s", latent.shape, start_image is not None, end_image is not None)
-        return ({"samples": latent, "num_frames": length, "width": width, "height": height},)
+        return (result,)
 
 
 class CosmosPredict2ImageToVideoLatent:
@@ -350,8 +365,23 @@ class CosmosPredict2ImageToVideoLatent:
         h_latent = (height // 8 // 2) * 2
         w_latent = (width // 8 // 2) * 2
         latent = mx.zeros((1, 16, t_latent, h_latent, w_latent), dtype=mx.float32)
+        result = {"samples": latent, "num_frames": length, "width": width, "height": height}
+        if start_image is not None:
+            import tempfile
+            from PIL import Image as PILImage
+            img_arr = start_image
+            if isinstance(img_arr, mx.array):
+                img_arr = np.array(img_arr)
+            if img_arr.ndim == 4:
+                img_arr = img_arr[0]
+            pil_img = PILImage.fromarray((np.clip(img_arr, 0, 1) * 255).astype(np.uint8))
+            tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False, prefix="fusion_cosmos_p2_i2v_")
+            pil_img.save(tmp.name)
+            tmp.close()
+            result["_i2v_image_path"] = tmp.name
+            logger.info("CosmosPredict2ImageToVideoLatent: saved start_image to %s for i2v", tmp.name)
         logger.info("CosmosPredict2ImageToVideoLatent: shape=%s start=%s end=%s", latent.shape, start_image is not None, end_image is not None)
-        return ({"samples": latent, "num_frames": length, "width": width, "height": height},)
+        return (result,)
 
 
 class EmptyLTXVLatentVideo:

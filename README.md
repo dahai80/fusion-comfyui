@@ -106,6 +106,9 @@ Phase 3 features still depend on future fusion-mlx support:
 - NVFP4 weight reader (E2M1 + block scale dequant)
 - Metal async dispatch pipeline (split command buffer for CPU/GPU overlap)
 
+HunyuanVideo MLX rewrite (all weight-matched, upstream [#15](https://github.com/dahai80/fusion-mlx/issues/15)):
+VAE 248/248, DiT 856/856, TextEncoder CLIP-L 196/196 + Llama3-8B 290/290; real tokenizers added; e2e t2v verified.
+
 ## Requirements
 
 - Python 3.10+

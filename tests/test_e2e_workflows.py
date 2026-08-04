@@ -295,7 +295,7 @@ def _build_ipadapter_flux(model_name, source_image, ipadapter_file, prompt,
 
 class TestHunyuanVideo:
     @pytest.mark.xfail(
-        reason="fusion-mlx #15: VAE/DiT/TextEncoder architectures don't match official weights (0/184+890+536 params loaded); produces all-black output",
+        reason="fusion-mlx #15: DiT/TextEncoder architectures don't match official weights (0/890+536 params loaded); VAE fixed (248/248) but DiT+TextEncoder still scaffold placeholders",
         strict=True,
     )
     def test_t2v(self):

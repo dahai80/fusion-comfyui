@@ -4,10 +4,14 @@ from dataclasses import dataclass
 
 logger = logging.getLogger("fusion_comfyui.core.config")
 
+# Env knob names mirror fusion-mlx's actual spec-denoise knobs so that setting
+# them here takes effect in the engine (fusion-mlx reads os.environ directly).
 _DEFAULTS = {
-    "FUSION_SPECULATIVE_DENOISING": "0",
-    "FUSION_SPEC_DRAFT_STEPS": "2",
-    "FUSION_SPEC_DRAFT_MODEL": "",
+    "FUSION_SPECULATIVE_DENOISE": "0",
+    "FUSION_SPEC_K": "4",
+    "FUSION_SPEC_EPSILON": "0.1",
+    "FUSION_SPEC_DRAFT_BLOCKS": "",
+    "FUSION_SPEC_EVAL_STEPS": "1",
     "FUSION_RADIX_CACHE_ENABLED": "0",
     "FUSION_RADIX_CACHE_MAX_MB": "512",
     "FUSION_NVFP4_ENABLED": "0",
@@ -17,9 +21,11 @@ _DEFAULTS = {
 
 @dataclass
 class Phase3Config:
-    speculative_denoising: bool = False
-    spec_draft_steps: int = 2
-    spec_draft_model: str = ""
+    spec_denoise_enabled: bool = False
+    spec_k: int = 4
+    spec_epsilon: float = 0.1
+    spec_draft_blocks: str = ""
+    spec_eval_steps: int = 1
     radix_cache_enabled: bool = False
     radix_cache_max_mb: int = 512
     nvfp4_enabled: bool = False
@@ -27,9 +33,11 @@ class Phase3Config:
 
     def to_dict(self) -> dict:
         return {
-            "speculative_denoising": self.speculative_denoising,
-            "spec_draft_steps": self.spec_draft_steps,
-            "spec_draft_model": self.spec_draft_model,
+            "spec_denoise_enabled": self.spec_denoise_enabled,
+            "spec_k": self.spec_k,
+            "spec_epsilon": self.spec_epsilon,
+            "spec_draft_blocks": self.spec_draft_blocks,
+            "spec_eval_steps": self.spec_eval_steps,
             "radix_cache_enabled": self.radix_cache_enabled,
             "radix_cache_max_mb": self.radix_cache_max_mb,
             "nvfp4_enabled": self.nvfp4_enabled,
@@ -41,12 +49,16 @@ def load_config() -> Phase3Config:
     cfg = Phase3Config()
     for env_key, default in _DEFAULTS.items():
         val = os.environ.get(env_key, default)
-        if env_key == "FUSION_SPECULATIVE_DENOISING":
-            cfg.speculative_denoising = val in ("1", "true", "yes")
-        elif env_key == "FUSION_SPEC_DRAFT_STEPS":
-            cfg.spec_draft_steps = int(val)
-        elif env_key == "FUSION_SPEC_DRAFT_MODEL":
-            cfg.spec_draft_model = val
+        if env_key == "FUSION_SPECULATIVE_DENOISE":
+            cfg.spec_denoise_enabled = val in ("1", "true", "yes")
+        elif env_key == "FUSION_SPEC_K":
+            cfg.spec_k = int(val)
+        elif env_key == "FUSION_SPEC_EPSILON":
+            cfg.spec_epsilon = float(val)
+        elif env_key == "FUSION_SPEC_DRAFT_BLOCKS":
+            cfg.spec_draft_blocks = val
+        elif env_key == "FUSION_SPEC_EVAL_STEPS":
+            cfg.spec_eval_steps = int(val)
         elif env_key == "FUSION_RADIX_CACHE_ENABLED":
             cfg.radix_cache_enabled = val in ("1", "true", "yes")
         elif env_key == "FUSION_RADIX_CACHE_MAX_MB":

@@ -1,3 +1,4 @@
+import json
 import logging
 from pathlib import Path
 
@@ -507,6 +508,28 @@ class FusionLatentFromImage(BaseNode):
         return (latent,)
 
 
+class FusionDenoiseStats(BaseNode):
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("stats_json",)
+    CATEGORY = "fusion-mlx/debug"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "model": ("MODEL",),
+            }
+        }
+
+    async def execute(self, model):
+        stats = model.last_denoise_stats()
+        logger.info(
+            "FusionDenoiseStats: available=%s enabled=%s",
+            stats.get("available"), stats.get("enabled"),
+        )
+        return (json.dumps(stats, indent=2, default=str),)
+
+
 from fusion_comfyui.nodes.xiyouji.registry import (
     NODE_CLASS_MAPPINGS as _XIYOUJI_CLASS,
     NODE_DISPLAY_NAME_MAPPINGS as _XIYOUJI_DISPLAY,
@@ -525,6 +548,7 @@ NODE_CLASS_MAPPINGS = {
     "FusionInpaint": FusionInpaint,
     "FusionLoadImage": FusionLoadImage,
     "FusionLatentFromImage": FusionLatentFromImage,
+    "FusionDenoiseStats": FusionDenoiseStats,
 }
 NODE_CLASS_MAPPINGS.update(_XIYOUJI_CLASS)
 
@@ -541,6 +565,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "FusionInpaint": "⚡ Fusion-MLX Inpaint",
     "FusionLoadImage": "⚡ Fusion-MLX Load Image",
     "FusionLatentFromImage": "⚡ Fusion-MLX Image→Latent",
+    "FusionDenoiseStats": "⚡ Fusion-MLX Denoise Stats",
 }
 NODE_DISPLAY_NAME_MAPPINGS.update(_XIYOUJI_DISPLAY)
 

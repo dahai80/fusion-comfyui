@@ -7,7 +7,8 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "FusionComfyUI",
-            path: "."
+            path: ".",
+            exclude: ["Scripts"]
         ),
     ]
 )

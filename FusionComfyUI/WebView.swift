@@ -9,15 +9,20 @@ struct WebViewWrapper: NSViewRepresentable {
         let config = WKWebViewConfiguration()
         config.preferences.isElementFullscreenEnabled = true
         let webView = WKWebView(frame: .zero, configuration: config)
+        context.coordinator.webView = webView
         return webView
     }
 
     func updateNSView(_ nsView: WKWebView, context: Context) {
-        if serverManager.isRunning {
+        if serverManager.status == .running, nsView.url != url {
             let request = URLRequest(url: url)
-            if nsView.url != url {
-                nsView.load(request)
-            }
+            nsView.load(request)
         }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator {
+        weak var webView: WKWebView?
     }
 }

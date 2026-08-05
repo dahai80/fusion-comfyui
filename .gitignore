@@ -39,6 +39,7 @@ FusionComfyUI.app/
 
 # Runtime output
 output/
+.run/
 
 # IDE / tooling
 .claude/

@@ -140,6 +140,19 @@ def pytest_configure(config):
     _core_pkg.__package__ = "core"
     sys.modules["core"] = _core_pkg
 
+    _core_async_utils = types.ModuleType("core.async_utils")
+    _core_async_utils.__file__ = os.path.join(PLUGIN_ROOT, "core", "async_utils.py")
+    sys.modules["core.async_utils"] = _core_async_utils
+    try:
+        import importlib
+        real_async_utils = importlib.reload(_core_async_utils)
+        sys.modules["core.async_utils"] = real_async_utils
+        _core_pkg.async_utils = real_async_utils
+    except Exception:
+        _core_async_utils.run_async = MagicMock(return_value=None)
+        _core_async_utils.get_shared_executor = MagicMock()
+        _core_pkg.async_utils = _core_async_utils
+
     _core_lifecycle = types.ModuleType("core.lifecycle")
     _core_lifecycle.FusionMemoryGuardian = MagicMock()
     _core_lifecycle.PipelineStageContext = MagicMock()

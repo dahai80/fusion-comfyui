@@ -7,6 +7,9 @@ architect.md
 example_bench.md
 plan.md
 
+# Local-only environment setup script
+startTian.sh
+
 # Upstream sub-repos (cloned separately)
 ComfyUI/
 ComfyUI_examples/

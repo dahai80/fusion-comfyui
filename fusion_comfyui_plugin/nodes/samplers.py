@@ -4,8 +4,8 @@ import logging
 import mlx.core as mx
 import numpy as np
 
-import comfy.samplers
 import core.async_utils
+from ._sampler_constants import SAMPLER_NAMES, SCHEDULER_NAMES
 
 logger = logging.getLogger("fusion_comfyui.nodes.samplers")
 
@@ -138,8 +138,8 @@ class KSampler:
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff, "control_after_generate": True}),
                 "steps": ("INT", {"default": 20, "min": 1, "max": 10000}),
                 "cfg": ("FLOAT", {"default": 8.0, "min": 0.0, "max": 100.0, "step": 0.1, "round": 0.01}),
-                "sampler_name": (list(comfy.samplers.SAMPLER_NAMES),),
-                "scheduler": (list(comfy.samplers.SCHEDULER_NAMES),),
+                "sampler_name": (list(SAMPLER_NAMES),),
+                "scheduler": (list(SCHEDULER_NAMES),),
                 "positive": ("CONDITIONING",),
                 "negative": ("CONDITIONING",),
                 "latent_image": ("LATENT",),
@@ -252,8 +252,8 @@ class KSamplerAdvanced:
                 "noise_seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff, "control_after_generate": True}),
                 "steps": ("INT", {"default": 20, "min": 1, "max": 10000}),
                 "cfg": ("FLOAT", {"default": 8.0, "min": 0.0, "max": 100.0, "step": 0.1, "round": 0.01}),
-                "sampler_name": (list(comfy.samplers.SAMPLER_NAMES),),
-                "scheduler": (list(comfy.samplers.SCHEDULER_NAMES),),
+                "sampler_name": (list(SAMPLER_NAMES),),
+                "scheduler": (list(SCHEDULER_NAMES),),
                 "positive": ("CONDITIONING",),
                 "negative": ("CONDITIONING",),
                 "latent_image": ("LATENT",),

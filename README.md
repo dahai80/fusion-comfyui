@@ -118,6 +118,35 @@ Phase 3 status (fusion-mlx machinery landed):
 HunyuanVideo MLX rewrite (all weight-matched, upstream [#15](https://github.com/dahai80/fusion-mlx/issues/15)):
 VAE 248/248, DiT 856/856, TextEncoder CLIP-L 196/196 + Llama3-8B 290/290; real tokenizers added; e2e t2v verified.
 
+## Phase 4: macOS Native App
+
+`FusionComfyUI/` is a SwiftPM package: a SwiftUI shell with an embedded WebKit view that wraps the ComfyUI frontend, auto-starts the backend on `127.0.0.1:8189`, and offers model downloads via `fusion-mlx pull` (mirror-aware).
+
+The app does **not** bundle a Python runtime — it launches the dev `.venv` through a tracked `start.sh` at the repo root. Set `FUSION_COMFYUI_START_SH` to point at a different `start.sh` if the app is relocated.
+
+```bash
+# Build the .app bundle (unsigned, runs locally)
+cd FusionComfyUI && Scripts/build.sh
+open ".build/Fusion ComfyUI.app"
+
+# Or run directly from source
+cd FusionComfyUI && swift run
+
+# Server lifecycle (the app calls these; you can run them manually)
+./start.sh start    # launches ComfyUI on :8189, waits for /system_stats
+./start.sh status
+./start.sh stop
+./start.sh log -f
+```
+
+Components:
+- `start.sh` — repo-root lifecycle manager (`start|stop|status|log|restart`); activates `/Users/dahai/fusion/.venv`, runs `python ComfyUI/main.py --port 8189 --listen 127.0.0.1`, pidfile + `wait_healthy`, sets `HF_MIRROR=https://hf-mirror.com`.
+- `ServerManager.swift` — launches `start.sh start`, probes `GET /system_stats` until healthy, exposes `.stopped/.starting/.running/.failed` state.
+- `ModelManager.swift` — lists models from `/object_info` + local `~/.fusion-mlx/models` cache; `Pull` button runs `fusion-mlx pull <repo>` with `HF_MIRROR=https://hf-mirror.com` and streams output.
+- `WebView.swift` / `FusionComfyUIApp.swift` — WKWebView loads the ComfyUI frontend once the server is healthy; status dot + Models sheet.
+
+Requires macOS 14+ (Sonoma), Apple Silicon (arm64).
+
 ## Requirements
 
 - Python 3.10+

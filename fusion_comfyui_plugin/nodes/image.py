@@ -8,6 +8,9 @@ import numpy as np
 
 logger = logging.getLogger("fusion_comfyui.nodes.image")
 
+disable_metadata = False
+logger.debug("image node metadata embedding: %s", "disabled" if disable_metadata else "enabled")
+
 
 class LoadImage:
     @classmethod
@@ -107,7 +110,6 @@ class SaveImage:
         from PIL import Image
         from PIL.PngImagePlugin import PngInfo
         import folder_paths
-        import comfy.cli_args as args
 
         filename_prefix += self.prefix_append
         h, w = images.shape[1], images.shape[2]
@@ -122,7 +124,7 @@ class SaveImage:
                 i = 255.0 * np.array(image)
             img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
             metadata = None
-            if not getattr(args, "disable_metadata", False):
+            if not disable_metadata:
                 metadata = PngInfo()
                 if prompt is not None:
                     metadata.add_text("prompt", json.dumps(prompt))

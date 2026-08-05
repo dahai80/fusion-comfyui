@@ -4,7 +4,7 @@ import math
 import mlx.core as mx
 import numpy as np
 
-import comfy.samplers
+from ._sampler_constants import SAMPLER_NAMES
 
 logger = logging.getLogger("fusion_comfyui.nodes.passthrough")
 
@@ -119,7 +119,7 @@ class KSamplerSelect:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "sampler_name": (list(comfy.samplers.SAMPLER_NAMES),),
+                "sampler_name": (list(SAMPLER_NAMES),),
             }
         }
     RETURN_TYPES = ("SAMPLER",)

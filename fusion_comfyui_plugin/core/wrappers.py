@@ -132,7 +132,7 @@ class FusionConditioning:
 
 def _infer_model_type(model_name: str) -> str:
     name = model_name.lower()
-    if any(k in name for k in ("wan", "ltx", "skyreels", "cosmos", "hunyuan", "svd")):
+    if any(k in name for k in ("wan", "ltx", "skyreels", "cosmos", "hunyuan", "svd", "stable-video", "img2vid")):
         return "video"
     return "image"
 
@@ -146,6 +146,7 @@ def _available_video_models() -> list:
         "SkyReels-V3-R2V-14B-MLX", "SkyReels-V3-V2V-14B-MLX",
         "Cosmos-7B", "Cosmos-Predict2", "Wan2.2-TI2V-5B-mlx-q8",
         "FLUX.2-klein-base-4B", "FLUX.2-klein-9b", "FLUX.2-dev-mxfp8",
+        "stable-video-diffusion-img2vid-xt", "stable-video-diffusion-img2vid",
     ]
     found = []
     for m in known_video:
@@ -174,6 +175,14 @@ def _fallback_model(requested: str) -> str:
     if "flux" in name and "FLUX.2-klein-base-4B" in available:
         logger.info("Falling back %s -> FLUX.2-klein-base-4B (requested not available)", requested)
         return "FLUX.2-klein-base-4B"
+    if "svd" in name or "stable-video" in name or "img2vid" in name:
+        for svd_name in (
+            "stable-video-diffusion-img2vid-xt",
+            "stable-video-diffusion-img2vid",
+        ):
+            if svd_name in available:
+                logger.info("Falling back %s -> %s (SVD i2v)", requested, svd_name)
+                return svd_name
     if any(k in name for k in ("sd_xl", "sdxl", "stable_diffusion", "sd15")):
         if "FLUX.2-klein-base-4B" in available:
             logger.info("Falling back %s -> FLUX.2-klein-base-4B (no SD backend)", requested)
@@ -233,6 +242,12 @@ def _map_checkpoint_to_model_name(ckpt_name: str) -> str:
         return "Cosmos-7B"
     if "hunyuan" in name:
         return "HunyuanVideo"
+    if "svd" in name or "stable-video" in name or "img2vid" in name:
+        if "xt" in name:
+            logger.info("Mapping SVD-XT checkpoint %s -> stable-video-diffusion-img2vid-xt", ckpt_name)
+            return "stable-video-diffusion-img2vid-xt"
+        logger.info("Mapping SVD checkpoint %s -> stable-video-diffusion-img2vid", ckpt_name)
+        return "stable-video-diffusion-img2vid"
     if any(k in name for k in ("sd_xl", "sdxl", "stable_diffusion_xl", "sd15", "stable_diffusion")):
         logger.info("Mapping SD checkpoint %s -> FLUX.2-klein-base-4B (no SD backend)", ckpt_name)
         return "FLUX.2-klein-base-4B"
@@ -335,6 +350,10 @@ def _map_unet_name_to_model_name(unet_name: str) -> str:
         return "Cosmos-7B"
     if "hunyuan" in name:
         return "HunyuanVideo"
+    if "svd" in name or "stable-video" in name or "img2vid" in name:
+        resolved = _fallback_model("stable-video-diffusion-img2vid-xt")
+        logger.info("Map SVD unet %s -> %s (i2v)", unet_name, resolved)
+        return resolved
     if "cogvideo" in name:
         return unet_name
     return unet_name

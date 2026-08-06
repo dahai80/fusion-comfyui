@@ -114,6 +114,12 @@ class TestInferModelType:
         assert _infer_model_type("FLUX.2-dev") == "image"
         assert _infer_model_type("unknown") == "image"
 
+    def test_svd(self):
+        from core.wrappers import _infer_model_type
+        assert _infer_model_type("svd_xt.safetensors") == "video"
+        assert _infer_model_type("stable-video-diffusion-img2vid-xt") == "video"
+        assert _infer_model_type("stable-video-diffusion-img2vid") == "video"
+
 
 class TestMapCheckpoint:
     def test_ltx(self):
@@ -143,6 +149,11 @@ class TestMapCheckpoint:
     def test_hunyuan(self):
         from core.wrappers import _map_checkpoint_to_model_name
         assert _map_checkpoint_to_model_name("hunyuan-video.safetensors") == "HunyuanVideo"
+
+    def test_svd(self):
+        from core.wrappers import _map_checkpoint_to_model_name
+        assert _map_checkpoint_to_model_name("svd.safetensors") == "stable-video-diffusion-img2vid"
+        assert _map_checkpoint_to_model_name("svd_xt.safetensors") == "stable-video-diffusion-img2vid-xt"
 
     def test_unknown(self):
         from core.wrappers import _map_checkpoint_to_model_name
@@ -287,6 +298,12 @@ class TestMapUnetName:
         from core.wrappers import _map_unet_name_to_model_name
         result = _map_unet_name_to_model_name("hunyuan-video")
         assert result == "HunyuanVideo"
+
+    def test_svd(self):
+        from core.wrappers import _map_unet_name_to_model_name
+        with patch("core.wrappers._fallback_model", return_value="stable-video-diffusion-img2vid-xt"):
+            result = _map_unet_name_to_model_name("svd_xt")
+            assert result == "stable-video-diffusion-img2vid-xt"
 
     def test_unknown(self):
         from core.wrappers import _map_unet_name_to_model_name

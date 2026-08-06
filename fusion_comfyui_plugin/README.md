@@ -433,13 +433,15 @@ Apply lip-sync to a video using an audio track. Outputs synchronized video frame
 | SkyReels-V3-V2V-14B-MLX | Video (V2V) | MLX | discoverable |
 | Cosmos-7B | Video | - | ❌ no backend |
 | HunyuanVideo | Video | - | ❌ no backend |
+| stable-video-diffusion-img2vid-xt | Video (I2V) | fp16 | routed (pending model download) |
+| stable-video-diffusion-img2vid | Video (I2V) | fp16 | routed (pending model download) |
 
 ### Native Node Overrides
 
 The following ComfyUI native nodes are overridden to route through fusion-mlx:
 
 - **CheckpointLoaderSimple** → loads model as FusionModelWrapper
-- **UNETLoader** → maps unet name to fusion-mlx model (supports wan, ltx, ltx-2, skyreels subtypes, flux, cosmos, hunyuan)
+- **UNETLoader** → maps unet name to fusion-mlx model (supports wan, ltx, ltx-2, skyreels subtypes, flux, cosmos, hunyuan, svd)
 - **CLIPLoader** → maps clip type to fusion-mlx model
 - **VAELoader** → maps vae name to fusion-mlx model
 - **KSampler** → calls fusion-mlx monolithic generate()

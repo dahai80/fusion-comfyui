@@ -1,4 +1,6 @@
 
+import pytest
+
 from fusion_comfyui.dag.types import NodeDef, LinkDef, Workflow, KNOWN_TYPES, VALID_LINKS
 
 
@@ -69,3 +71,12 @@ class TestWorkflow:
         assert order.index("1") < order.index("3")
         assert order.index("2") < order.index("4")
         assert order.index("3") < order.index("4")
+
+    def test_topo_order_cycle_raises(self):
+        wf = Workflow()
+        wf.nodes["1"] = NodeDef(id="1", type="A")
+        wf.nodes["2"] = NodeDef(id="2", type="B")
+        wf.links.append(LinkDef(id="l1", src_node="1", src_slot=0, src_type="MODEL", dst_node="2", dst_slot=0, dst_type="MODEL"))
+        wf.links.append(LinkDef(id="l2", src_node="2", src_slot=0, src_type="MODEL", dst_node="1", dst_slot=0, dst_type="MODEL"))
+        with pytest.raises(ValueError, match="cycle"):
+            wf.topo_order()

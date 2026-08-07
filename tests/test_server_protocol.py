@@ -65,6 +65,30 @@ class TestHistory:
         resp = await history(pending)
         data = json.loads(resp.body)
         assert "abc" in data
+        rec = data["abc"]
+        assert "outputs" in rec
+        assert isinstance(rec["status"], dict)
+        assert rec["status"]["status_str"] in ("success", "error", "done", "unknown", "queued", "running")
+
+    @pytest.mark.asyncio
+    async def test_success_record_has_completed_status(self):
+        pending = {"abc": {"status": "ok", "outputs": {"1": {"image": "x.png"}}}}
+        resp = await history_single("abc", pending)
+        data = json.loads(resp.body)
+        st = data["abc"]["status"]
+        assert st["status_str"] == "success"
+        assert st["completed"] is True
+        assert data["abc"]["outputs"]["1"]["image"] == "x.png"
+
+    @pytest.mark.asyncio
+    async def test_error_record_has_error_messages(self):
+        pending = {"abc": {"status": "error", "errors": ["boom"]}}
+        resp = await history_single("abc", pending)
+        data = json.loads(resp.body)
+        st = data["abc"]["status"]
+        assert st["status_str"] == "error"
+        assert st["completed"] is True
+        assert ["execution_error", "boom"] in st["messages"]
 
     @pytest.mark.asyncio
     async def test_history_single_found(self):
@@ -94,6 +118,16 @@ class TestQueueStatus:
         result = get_queue_status(pending)
         assert len(result["queue_running"]) == 2
         assert len(result["queue_pending"]) == 0
+
+    def test_queued_status_classified_to_pending(self):
+        pending = {
+            "q1": {"status": "queued"},
+            "r1": {"status": "running"},
+        }
+        result = get_queue_status(pending)
+        assert len(result["queue_running"]) == 1
+        assert len(result["queue_pending"]) == 1
+        assert result["queue_pending"][0]["prompt_id"] == "q1"
 
 
 class TestInterrupt:

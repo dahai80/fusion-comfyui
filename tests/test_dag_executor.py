@@ -170,3 +170,52 @@ class TestDAGExecutor:
         await executor.execute(wf, progress_cb=cb)
         assert len(progress) == 1
         assert progress[0] == (1, 1, "1")
+
+    @pytest.mark.asyncio
+    async def test_node_event_cb_start_end(self):
+        registry = {"Dummy": _DummyNode}
+        executor = DAGExecutor(registry)
+        wf = Workflow(nodes={"1": NodeDef(id="1", type="Dummy", inputs={})}, links=[])
+        events = []
+
+        async def evt(phase, nid, ntype, current, total):
+            events.append((phase, nid, ntype, current, total))
+
+        result = await executor.execute(wf, node_event_cb=evt)
+        assert result["status"] == "ok"
+        assert events == [("start", "1", "Dummy", 1, 1), ("end", "1", "Dummy", 1, 1)]
+
+    @pytest.mark.asyncio
+    async def test_cycle_detected_fails_visibly(self):
+        registry = {"Dummy": _DummyNode}
+        executor = DAGExecutor(registry)
+        wf = Workflow(
+            nodes={
+                "1": NodeDef(id="1", type="Dummy", inputs={"x": ["2", 0]}),
+                "2": NodeDef(id="2", type="Dummy", inputs={"x": ["1", 0]}),
+            },
+            links=[
+                LinkDef(id="L1", src_node="1", src_slot=0, src_type="STRING",
+                        dst_node="2", dst_slot=0, dst_type="STRING"),
+                LinkDef(id="L2", src_node="2", src_slot=0, src_type="STRING",
+                        dst_node="1", dst_slot=0, dst_type="STRING"),
+            ],
+        )
+        result = await executor.execute(wf)
+        assert result["status"] == "error"
+        assert any("cycle" in str(e) for e in result["errors"])
+
+    @pytest.mark.asyncio
+    async def test_unresolved_link_fails_visibly(self):
+        registry = {"Add": _AddNode}
+        executor = DAGExecutor(registry)
+        wf = Workflow(
+            nodes={
+                "1": NodeDef(id="1", type="Add", inputs={"a": ["99", 0], "b": 10}),
+            },
+            links=[],
+        )
+        result = await executor.execute(wf)
+        assert result["status"] == "error"
+        assert any("unresolved link" in str(e) for e in result["errors"])
+

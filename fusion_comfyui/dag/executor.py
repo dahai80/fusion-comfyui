@@ -123,12 +123,16 @@ class DAGExecutor:
         self._outputs: dict[str, Any] = {}
         logger.info("DAGExecutor: registry has %d node types", len(self.registry))
 
-    async def execute(self, workflow: Workflow, progress_cb=None) -> dict[str, Any]:
+    async def execute(self, workflow: Workflow, progress_cb=None, node_event_cb=None) -> dict[str, Any]:
         errors = workflow.validate()
         if errors:
             logger.error("workflow validation failed: %s", errors)
             return {"status": "error", "errors": errors}
-        order = workflow.topo_order()
+        try:
+            order = workflow.topo_order()
+        except ValueError as e:
+            logger.error("workflow topo_order failed: %s", e)
+            return {"status": "error", "errors": [str(e)]}
         total = len(order)
         self._outputs = {}
         for idx, nid in enumerate(order):
@@ -142,14 +146,24 @@ class DAGExecutor:
                 return {"status": "error", "errors": [f"unknown node type: {ndef.type}"]}
             node_cls = self.registry[ndef.type]
             node = node_cls()
-            resolved_inputs = self._resolve_inputs(ndef.inputs, workflow, nid)
             logger.info("executing [%d/%d] node=%s type=%s", idx + 1, total, nid, ndef.type)
+            if node_event_cb:
+                try:
+                    await node_event_cb("start", nid, ndef.type, idx + 1, total)
+                except Exception:
+                    logger.debug("node_event_cb start failed for %s", nid)
             try:
+                resolved_inputs = self._resolve_inputs(ndef.inputs, workflow, nid)
                 result = await node.execute(**resolved_inputs)
             except Exception as e:
                 logger.exception("node %s (%s) failed", nid, ndef.type)
                 return {"status": "error", "errors": [f"node {nid}: {e}"]}
             self._outputs[nid] = result
+            if node_event_cb:
+                try:
+                    await node_event_cb("end", nid, ndef.type, idx + 1, total)
+                except Exception:
+                    logger.debug("node_event_cb end failed for %s", nid)
             if progress_cb:
                 await progress_cb(idx + 1, total, nid, ndef.type)
         return {"status": "ok", "outputs": self._outputs}
@@ -166,8 +180,10 @@ class DAGExecutor:
                     else:
                         resolved[key] = out
                 else:
-                    logger.warning("unresolved link: %s <- %s[%s]", key, src_nid, src_slot)
-                    resolved[key] = val
+                    logger.error("unresolved link on node %s: %s <- %s[%s]", node_id, key, src_nid, src_slot)
+                    raise ValueError(
+                        f"unresolved link on node {node_id}: {key} <- {src_nid}[{src_slot}]"
+                    )
             else:
                 resolved[key] = val
         return resolved

@@ -29,7 +29,7 @@ async def submit_prompt(prompt_data: dict, executor, pending: dict, run_workflow
     prompt_id = prompt_data.get("prompt_id") or str(uuid.uuid4())
 
     workflow = parse_workflow(prompt)
-    pending[prompt_id] = {"status": "running", "workflow": workflow}
+    pending[prompt_id] = {"status": "queued", "workflow": workflow}
 
     import asyncio
     asyncio.create_task(run_workflow_fn(prompt_id, workflow, client_id))
@@ -37,14 +37,35 @@ async def submit_prompt(prompt_data: dict, executor, pending: dict, run_workflow
     return JSONResponse(content={"prompt_id": prompt_id, "status": "queued", "number": len(pending)})
 
 
+def _to_history_record(info: dict) -> dict:
+    state = info.get("status", "unknown")
+    if state in ("ok", "success"):
+        status_obj = {"status_str": "success", "completed": True, "messages": []}
+    elif state in ("error", "interrupted"):
+        status_obj = {
+            "status_str": "error",
+            "completed": True,
+            "messages": [["execution_error", msg] for msg in info.get("errors", [])],
+        }
+    else:
+        status_obj = {"status_str": state, "completed": False, "messages": []}
+    return {
+        "outputs": info.get("outputs", {}),
+        "status": status_obj,
+        "meta": {"prompt_id": None},
+    }
+
+
 async def history(pending: dict):
-    return JSONResponse(content=pending)
+    logger.debug("history requested records=%d", len(pending))
+    return JSONResponse(content={pid: _to_history_record(info) for pid, info in pending.items()})
 
 
 async def history_single(prompt_id: str, pending: dict):
     if prompt_id not in pending:
         raise HTTPException(status_code=404, detail="prompt not found")
-    return JSONResponse(content={prompt_id: pending[prompt_id]})
+    logger.debug("history_single prompt_id=%s state=%s", prompt_id, pending[prompt_id].get("status"))
+    return JSONResponse(content={prompt_id: _to_history_record(pending[prompt_id])})
 
 
 async def upload_image(

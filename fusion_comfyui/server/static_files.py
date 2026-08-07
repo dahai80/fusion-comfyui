@@ -21,7 +21,7 @@ def get_output_dir() -> Path:
 
 
 def get_frontend_dir() -> Path:
-    if _frontend_dir.exists():
+    if str(_frontend_dir) not in ("", ".") and _frontend_dir.exists():
         return _frontend_dir
     bundled = Path(__file__).parent.parent / "frontend"
     if bundled.exists():
@@ -31,7 +31,12 @@ def get_frontend_dir() -> Path:
 
 def view_file(filename: str, subfolder: str = "", ttype: str = "output"):
     base = _output_dir / subfolder if subfolder else _output_dir
-    fpath = base / filename
+    fpath = (base / filename).resolve()
+    try:
+        fpath.relative_to(base.resolve())
+    except ValueError:
+        logger.warning("view_file: path traversal rejected filename=%s subfolder=%s", filename, subfolder)
+        raise HTTPException(status_code=404, detail="file not found")
     if not fpath.exists():
         raise HTTPException(status_code=404, detail="file not found")
     return FileResponse(str(fpath))

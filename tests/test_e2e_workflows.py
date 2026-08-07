@@ -76,10 +76,28 @@ def _check_comfyui_alive():
         return False
 
 
+def _available_node_types():
+    try:
+        data = _api_get("/object_info")
+        return set(data.keys())
+    except Exception:
+        return set()
+
+
+REQUIRED_SHORTCUT_NODES = {"FusionImageGen", "FusionVideoGen", "FusionSaveVideo"}
+
+
 @pytest.fixture(scope="session", autouse=True)
 def comfyui_running():
     if not _check_comfyui_alive():
         pytest.skip("ComfyUI not running on port 11443")
+    available = _available_node_types()
+    missing = REQUIRED_SHORTCUT_NODES - available
+    if missing:
+        pytest.skip(
+            f"server on 11443 missing Phase-1 plugin shortcut nodes {sorted(missing)}; "
+            f"run e2e against ComfyUI phase-1 server (loads fusion_comfyui_plugin nodes)"
+        )
 
 
 def _verify_output(outputs):

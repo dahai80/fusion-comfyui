@@ -74,6 +74,28 @@ FusionComfyUI/           # Phase 4 macOS native app (Swift)
 └── Package.swift
 ```
 
+## Dependencies & Netlayer
+
+fusion-comfyui depends on [fusion-mlx](https://github.com/dahai80/fusion-mlx) as
+its MLX inference engine. Unlike other fusion-* services that reach fusion-mlx
+over HTTP (`localhost:11434`), **fusion-comfyui imports fusion-mlx in-process**:
+`fusion_comfyui_plugin/__init__.py` installs the `fusion_mlx._torch_stub` shim,
+and `core/engine_wrapper.py` calls `fusion_mlx.engines` directly within the same
+Python process.
+
+This is a deliberate, declared exception to the monorepo HTTP-routing convention
+(documented in `architecture/netlayer-compliance-plan.md` §5.5):
+
+- **Phase 1 (current)** — in-process import is declared here; no network hop,
+  no `X-Fusion-Source` header. Behavior unchanged.
+- **Phase 2 (future)** — evaluate adding an `X-Fusion-Source: comfyui` marker
+  and permitting in-process calls explicitly on the fusion-mlx side.
+- **Phase 3 (future)** — evaluate migrating to HTTP/gRPC via `fusion-gateway`,
+  or keeping in-process but read-only.
+
+Requires `fusion-mlx` to be importable in the same `.venv` (installed via the
+shared monorepo virtualenv at `/Users/dahai/fusion/.venv`).
+
 ## Phase 3 Configuration
 
 Phase 3 features are controlled via environment variables. Speculative denoising
@@ -120,7 +142,7 @@ VAE 248/248, DiT 856/856, TextEncoder CLIP-L 196/196 + Llama3-8B 290/290; real t
 
 ## Phase 4: macOS Native App
 
-`FusionComfyUI/` is a SwiftPM package: a SwiftUI shell with an embedded WebKit view that wraps the ComfyUI frontend, auto-starts the backend on `127.0.0.1:8189`, and offers model downloads via `fusion-mlx pull` (mirror-aware).
+`FusionComfyUI/` is a SwiftPM package: a SwiftUI shell with an embedded WebKit view that wraps the ComfyUI frontend, auto-starts the backend on `127.0.0.1:11445`, and offers model downloads via `fusion-mlx pull` (mirror-aware).
 
 The app does **not** bundle a Python runtime — it launches the dev `.venv` through a tracked `start.sh` at the repo root. Set `FUSION_COMFYUI_START_SH` to point at a different `start.sh` if the app is relocated.
 
@@ -133,14 +155,14 @@ open ".build/Fusion ComfyUI.app"
 cd FusionComfyUI && swift run
 
 # Server lifecycle (the app calls these; you can run them manually)
-./start.sh start    # launches ComfyUI on :8189, waits for /system_stats
+./start.sh start    # launches ComfyUI on :11445, waits for /system_stats
 ./start.sh status
 ./start.sh stop
 ./start.sh log -f
 ```
 
 Components:
-- `start.sh` — repo-root lifecycle manager (`start|stop|status|log|restart`); activates `/Users/dahai/fusion/.venv`, runs `python ComfyUI/main.py --port 8189 --listen 127.0.0.1`, pidfile + `wait_healthy`, sets `HF_MIRROR=https://hf-mirror.com`.
+- `start.sh` — repo-root lifecycle manager (`start|stop|status|log|restart`); activates `/Users/dahai/fusion/.venv`, runs `python ComfyUI/main.py --port 11445 --listen 127.0.0.1`, pidfile + `wait_healthy`, sets `HF_MIRROR=https://hf-mirror.com`.
 - `ServerManager.swift` — launches `start.sh start`, probes `GET /system_stats` until healthy, exposes `.stopped/.starting/.running/.failed` state.
 - `ModelManager.swift` — lists models from `/object_info` + local `~/.fusion-mlx/models` cache; `Pull` button runs `fusion-mlx pull <repo>` with `HF_MIRROR=https://hf-mirror.com` and streams output.
 - `WebView.swift` / `FusionComfyUIApp.swift` — WKWebView loads the ComfyUI frontend once the server is healthy; status dot + Models sheet.

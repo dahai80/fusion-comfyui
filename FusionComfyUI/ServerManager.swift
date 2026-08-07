@@ -15,7 +15,7 @@ final class ServerManager: ObservableObject {
     @Published var lastError: String?
 
     let host: String = "127.0.0.1"
-    let port: Int = 8189
+    let port: Int = 11445
 
     var isRunning: Bool { status == .running }
     var baseURL: URL { URL(string: "http://\(host):\(port)")! }

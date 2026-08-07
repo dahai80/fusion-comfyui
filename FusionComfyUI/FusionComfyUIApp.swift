@@ -50,7 +50,7 @@ struct ContentView: View {
             case .starting:
                 VStack(spacing: 12) {
                     ProgressView().scaleEffect(1.2)
-                    Text("Starting ComfyUI server on :8189 ...")
+                    Text("Starting ComfyUI server on :11445 ...")
                         .font(.headline)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

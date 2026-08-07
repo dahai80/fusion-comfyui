@@ -77,7 +77,7 @@ package_app() {
         </dict>
     </dict>
     <key>NSNetworkUsageDescription</key>
-    <string>Fusion ComfyUI connects to the local ComfyUI server on 127.0.0.1:8189 and downloads models from hf-mirror.com.</string>
+    <string>Fusion ComfyUI connects to the local ComfyUI server on 127.0.0.1:11445 and downloads models from hf-mirror.com.</string>
 </dict>
 </plist>
 PLIST

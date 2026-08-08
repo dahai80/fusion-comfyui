@@ -85,6 +85,31 @@ PLIST
     info "app bundle ready: $APP_BUNDLE"
 }
 
+build_dmg() {
+    step "build DMG for $APP_NAME"
+    if [ ! -d "$APP_BUNDLE" ]; then
+        error "app bundle missing: $APP_BUNDLE — run 'package' first"
+        return 1
+    fi
+    local dmg_name="$APP_NAME-$VERSION-arm64.dmg"
+    local dmg_path="$BUILD_DIR/$dmg_name"
+    local staging="$BUILD_DIR/dmg-staging"
+    rm -rf "$staging" "$dmg_path" 2>/dev/null || true
+    mkdir -p "$staging"
+    cp -R "$APP_BUNDLE" "$staging/"
+    ln -s /Applications "$staging/Applications"
+    info "staged app + /Applications link"
+    local vol_name="${APP_NAME// /_}_$VERSION"
+    hdiutil create -volname "$vol_name" -srcfolder "$staging" \
+        -ov -format UDBZ "$dmg_path" >/dev/null 2>&1 || {
+        error "hdiutil failed"
+        rm -rf "$staging"
+        return 1
+    }
+    rm -rf "$staging"
+    info "DMG ready: $dmg_path ($(du -h "$dmg_path" | cut -f1))"
+}
+
 main() {
     local action="${1:-all}"
     case "$action" in
@@ -95,10 +120,17 @@ main() {
             build_app
             package_app
             ;;
+        dmg)
+            build_app
+            package_app
+            build_dmg
+            info "done: $BUILD_DIR/$APP_NAME-$VERSION-arm64.dmg"
+            ;;
         all)
             build_app
             package_app
-            info "done: $APP_BUNDLE"
+            build_dmg
+            info "done: $APP_BUNDLE + DMG"
             ;;
         clean)
             rm -rf "$BUILD_DIR" 2>/dev/null || true
@@ -106,7 +138,7 @@ main() {
             info "cleaned"
             ;;
         *)
-            echo "Usage: $0 {all|app|package|clean}"
+            echo "Usage: $0 {all|app|package|dmg|clean}"
             echo "  CONFIGURATION=debug|release (default release)"
             exit 1
             ;;

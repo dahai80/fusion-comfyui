@@ -73,7 +73,7 @@ class Workflow:
                 return
             if nid in temp:
                 logger.error("cycle detected at node %s", nid)
-                return
+                raise ValueError(f"cycle detected at node {nid}")
             temp.add(nid)
             for dep in deps.get(nid, set()):
                 visit(dep)

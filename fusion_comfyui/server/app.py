@@ -2,7 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, Query, UploadFile, File as FAFile, Form as FAForm
+from fastapi import FastAPI, Query, UploadFile, File as FAFile, Form as FAForm, WebSocket
 from fastapi.responses import JSONResponse
 
 from fusion_comfyui.dag.executor import DAGExecutor
@@ -126,7 +126,8 @@ async def _system_stats():
 
 
 @app.websocket("/ws")
-async def _websocket_endpoint(ws, client_id: str = ""):
+async def _websocket_endpoint(ws: WebSocket, client_id: str = ""):
+    logger.debug("ws endpoint invoked client_id=%s", client_id)
     await websocket_handler(ws, client_id)
 
 
@@ -144,6 +145,18 @@ async def _run_workflow(prompt_id: str, workflow, client_id: str):
         }
         await send_to_client(client_id, msg)
 
+    async def node_event_cb(phase, node_id, node_type, current, total):
+        if phase == "start":
+            await send_to_client(client_id, {
+                "type": "executing",
+                "data": {"node": node_id, "prompt_id": prompt_id},
+            })
+        else:
+            await send_to_client(client_id, {
+                "type": "executed",
+                "data": {"node": node_id, "prompt_id": prompt_id},
+            })
+
     async def step_progress_cb(step: int, total_steps: int):
         msg = {
             "type": "execution_progress",
@@ -156,12 +169,15 @@ async def _run_workflow(prompt_id: str, workflow, client_id: str):
         await send_to_client(client_id, msg)
 
     set_global_step_callback(step_progress_cb)
+    _pending[prompt_id] = {**_pending.get(prompt_id, {}), "status": "running"}
     try:
-        result = await _executor.execute(workflow, progress_cb=node_progress_cb)
+        result = await _executor.execute(
+            workflow, progress_cb=node_progress_cb, node_event_cb=node_event_cb,
+        )
         _pending[prompt_id] = {**result, "status": result.get("status", "ok")}
         await send_to_client(client_id, {
-            "type": "execution_success",
-            "data": {"prompt_id": prompt_id},
+            "type": "executing",
+            "data": {"node": None, "prompt_id": prompt_id},
         })
     except Exception as e:
         logger.exception("workflow %s failed", prompt_id)

@@ -54,3 +54,23 @@ class TestStaticFiles:
         (sub / "deep.png").write_bytes(b"deep")
         resp = view_file("deep.png", subfolder="sub")
         assert resp is not None
+
+    def test_view_file_rejects_traversal(self, tmp_path):
+        import fusion_comfyui.server.static_files as mod
+        from fastapi import HTTPException
+        secret = tmp_path.parent / "secret.txt"
+        secret.write_bytes(b"secret")
+        mod._output_dir = tmp_path
+        with pytest.raises(HTTPException) as exc:
+            view_file("../secret.txt")
+        assert exc.value.status_code == 404
+
+    def test_get_frontend_dir_empty_env_falls_back(self, tmp_path):
+        import fusion_comfyui.server.static_files as mod
+        mod._frontend_dir = Path("")
+        result = get_frontend_dir()
+        bundled = Path(__file__).parent.parent / "fusion_comfyui" / "frontend"
+        if bundled.exists():
+            assert result == bundled
+        else:
+            assert result == Path("")

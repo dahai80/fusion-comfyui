@@ -82,6 +82,13 @@ class _RadixNode:
 
 
 class RadixCache:
+    # Prefix-tree byte cache with LRU eviction. NOTE 2026-08-08: the original
+    # intent — prefix-shared T5 text embeddings across short-drama shots — is
+    # FALSIFIED: T5 bidirectional attention means token i's embedding depends on
+    # ALL tokens, so a shared text prefix yields no shared embedding prefix
+    # (collapses to exact-match; MLX compile cache already covers the latency).
+    # Retained as a correct data structure for a future genuinely-prefix-structured
+    # use (e.g. node-output dedup keyed by path-like ids). Not wired to encode_text.
     def __init__(self, max_mb: int = 512):
         self.max_bytes = max_mb * 1024 * 1024
         self._root = _RadixNode()

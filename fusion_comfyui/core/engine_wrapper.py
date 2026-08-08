@@ -19,6 +19,9 @@ _MODEL_TYPES = {
     "wan": "video",
     "skyreels": "video",
     "ltx": "video",
+    "cosmos": "video",
+    "hunyuan": "video",
+    "svd": "video",
 }
 
 _LATENT_CHANNELS = {
@@ -28,6 +31,9 @@ _LATENT_CHANNELS = {
     "wan": 16,
     "skyreels": 16,
     "ltx": 16,
+    "cosmos": 16,
+    "hunyuan": 16,
+    "svd": 4,
 }
 
 

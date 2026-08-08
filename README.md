@@ -28,7 +28,7 @@ Open `http://localhost:11443` — the ComfyUI frontend connects directly.
 | Phase 1 | ✅ Complete | ComfyUI custom nodes (PyTorch host + MLX compute) |
 | Phase 2 | ✅ Complete | Standalone FastAPI server, ComfyUI protocol, zero PyTorch |
 | Phase 3 | 🔧 In Progress | Spec denoise machinery ✅ (landed, default-off, accel falsified), Radix cache ❌ (FALSIFIED — T5 embeddings not prefix-reusable; compile cache covers latency), stats node ✅, NVFP4 blocked (mlx#2962), async dispatch needs fusion-mlx |
-| Phase 4 | 🔧 In Progress | Swift app split ✅, ServerManager/ModelManager ✅, needs packaging |
+| Phase 4 | ✅ Done | Swift app ✅, first-run setup assistant ✅, DMG+icon ✅, exit criteria verified (launch 0.15s, hf-mirror pull, no-terminal e2e T2V) |
 
 See [CONSTRUCTION_PLAN.md](CONSTRUCTION_PLAN.md) for full details.
 
@@ -199,12 +199,15 @@ VAE 248/248, DiT 856/856, TextEncoder CLIP-L 196/196 + Llama3-8B 290/290; real t
 
 `FusionComfyUI/` is a SwiftPM package: a SwiftUI shell with an embedded WebKit view that wraps the ComfyUI frontend, auto-starts the backend on `127.0.0.1:11445`, and offers model downloads via `fusion-mlx pull` (mirror-aware).
 
-The app does **not** bundle a Python runtime — it launches the dev `.venv` through a tracked `start.sh` at the repo root. Set `FUSION_COMFYUI_START_SH` to point at a different `start.sh` if the app is relocated.
+The app does **not** bundle a 3.5GB Python runtime. Instead, on first launch `SetupManager` bootstraps a dedicated venv at `~/.fusion-comfyui/venv`: it finds Homebrew Python ≥3.11, runs `python -m venv`, then `pip install -r ComfyUI/requirements.txt` + `pip install fusion-mlx` (all via the `hf-mirror.com` PyPI mirror). Setup happens once; subsequent launches skip straight to the server. The venv path is passed to `start.sh` via the `FUSION_VENV` env var. Override the venv root with `FUSION_COMFYUI_VENV_ROOT`. Set `FUSION_COMFYUI_START_SH` to point at a different `start.sh` if the app is relocated.
 
 ```bash
-# Build the .app bundle (unsigned, runs locally)
-cd FusionComfyUI && Scripts/build.sh
-open ".build/Fusion ComfyUI.app"
+# Build the .app bundle + DMG (unsigned, runs locally)
+cd FusionComfyUI && Scripts/build.sh all
+open ".build/Fusion ComfyUI.app"          # or install the DMG
+
+# Regenerate the app icon (.icns) from source
+cd FusionComfyUI && Scripts/build.sh icon
 
 # Or run directly from source
 cd FusionComfyUI && swift run
@@ -217,12 +220,15 @@ cd FusionComfyUI && swift run
 ```
 
 Components:
-- `start.sh` — repo-root lifecycle manager (`start|stop|status|log|restart`); activates `/Users/dahai/fusion/.venv`, runs `python ComfyUI/main.py --port 11445 --listen 127.0.0.1`, pidfile + `wait_healthy`, sets `HF_MIRROR=https://hf-mirror.com`.
-- `ServerManager.swift` — launches `start.sh start`, probes `GET /system_stats` until healthy, exposes `.stopped/.starting/.running/.failed` state.
+- `start.sh` — repo-root lifecycle manager (`start|stop|status|log|restart`); uses `FUSION_VENV` (default `/Users/dahai/fusion/.venv`), runs `python ComfyUI/main.py --port 11445 --listen 127.0.0.1`, pidfile + `wait_healthy`, sets `HF_MIRROR=https://hf-mirror.com`.
+- `SetupManager.swift` — first-run dependency bootstrap: finds Homebrew Python ≥3.11, creates `~/.fusion-comfyui/venv`, pip-installs ComfyUI requirements + `fusion-mlx` via hf-mirror, streams progress; gates the main UI until ready.
+- `ServerManager.swift` — launches `start.sh start` with `FUSION_VENV` in the child env, probes `GET /system_stats` until healthy, exposes `.stopped/.starting/.running/.failed` state.
 - `ModelManager.swift` — lists models from `/object_info` + local `~/.fusion-mlx/models` cache; `Pull` button runs `fusion-mlx pull <repo>` with `HF_MIRROR=https://hf-mirror.com` and streams output.
 - `WebView.swift` / `FusionComfyUIApp.swift` — WKWebView loads the ComfyUI frontend once the server is healthy; status dot + Models sheet.
+- `Scripts/build.sh` — `all|app|package|dmg|icon|clean`; `dmg` builds a UDBZ DMG with a `/Applications` drag-to-install symlink; `icon` regenerates `AppIcon.icns` from `make_icon.py`.
+- `Scripts/make_icon.py` — deterministically renders the Fusion app icon (PIL → iconset → `iconutil`).
 
-Requires macOS 14+ (Sonoma), Apple Silicon (arm64).
+Requires macOS 14+ (Sonoma), Apple Silicon (arm64). First-run setup needs Homebrew Python ≥3.11 (`brew install python@3.12`).
 
 ## Requirements
 

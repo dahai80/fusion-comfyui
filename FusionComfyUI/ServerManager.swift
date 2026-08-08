@@ -16,6 +16,7 @@ final class ServerManager: ObservableObject {
 
     let host: String = "127.0.0.1"
     let port: Int = 11445
+    var venvPath: String?
 
     var isRunning: Bool { status == .running }
     var baseURL: URL { URL(string: "http://\(host):\(port)")! }
@@ -29,6 +30,15 @@ final class ServerManager: ObservableObject {
     private var process: Process?
     private var healthTask: Task<Void, Never>?
 
+    private func buildEnv() -> [String: String] {
+        var env = ProcessInfo.processInfo.environment
+        if let venv = venvPath, !venv.isEmpty {
+            env["FUSION_VENV"] = venv
+            logger.info("server will use FUSION_VENV=\(venv, privacy: .public)")
+        }
+        return env
+    }
+
     func start() {
         guard status != .running, status != .starting else { return }
         status = .starting
@@ -38,6 +48,7 @@ final class ServerManager: ObservableObject {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/bin/bash")
         proc.arguments = [startShPath, "start"]
+        proc.environment = buildEnv()
         let pipe = Pipe()
         proc.standardOutput = pipe
         proc.standardError = pipe

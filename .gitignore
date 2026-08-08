@@ -54,3 +54,4 @@ build/
 
 # Debug logs
 pytestdebug.log
+AppIcon.iconset/

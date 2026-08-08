@@ -10,6 +10,9 @@ plan.md
 # Local-only environment setup script
 startTian.sh
 
+# Local-only promo materials (videos, slides)
+promo/
+
 # Upstream sub-repos (cloned separately)
 ComfyUI/
 ComfyUI_examples/

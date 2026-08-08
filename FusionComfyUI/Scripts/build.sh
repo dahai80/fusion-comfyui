@@ -35,6 +35,13 @@ package_app() {
     cp "$binary_path/FusionComfyUI" "$app_dir/MacOS/"
     info "copied binary"
 
+    if [ -f "$SCRIPT_DIR/AppIcon.icns" ]; then
+        cp "$SCRIPT_DIR/AppIcon.icns" "$app_dir/Resources/AppIcon.icns"
+        info "copied app icon"
+    else
+        info "no AppIcon.icns found (run 'python Scripts/make_icon.py' to generate)"
+    fi
+
     cat > "$app_dir/Info.plist" << PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -42,6 +49,8 @@ package_app() {
 <dict>
     <key>CFBundleExecutable</key>
     <string>FusionComfyUI</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>com.fusion-mlx.comfyui</string>
     <key>CFBundleName</key>
@@ -116,6 +125,9 @@ main() {
         app)
             build_app
             ;;
+        icon)
+            (cd "$PROJECT_DIR" && python "$SCRIPT_DIR/make_icon.py")
+            ;;
         package)
             build_app
             package_app
@@ -138,7 +150,7 @@ main() {
             info "cleaned"
             ;;
         *)
-            echo "Usage: $0 {all|app|package|dmg|clean}"
+            echo "Usage: $0 {all|app|package|dmg|icon|clean}"
             echo "  CONFIGURATION=debug|release (default release)"
             exit 1
             ;;

@@ -16,8 +16,10 @@ struct FusionComfyUIApp: App {
 struct ContentView: View {
     @ObservedObject var serverManager: ServerManager
     @StateObject private var modelManager: ModelManager
+    @StateObject private var setupManager = SetupManager()
     @State private var showModelsPanel = false
     @State private var repoInput = ""
+    @State private var setupDismissed = false
 
     init(serverManager: ServerManager) {
         self.serverManager = serverManager
@@ -25,6 +27,24 @@ struct ContentView: View {
     }
 
     var body: some View {
+        if setupManager.isReady || setupDismissed {
+            mainContent
+        } else {
+            SetupView(setupManager: setupManager) {
+                setupDismissed = true
+                startServer()
+            }
+        }
+    }
+
+    private func startServer() {
+        if !setupManager.venvPath.isEmpty {
+            serverManager.venvPath = setupManager.venvPath
+        }
+        serverManager.start()
+    }
+
+    private var mainContent: some View {
         VStack(spacing: 0) {
             HStack {
                 Circle()
@@ -83,7 +103,7 @@ struct ContentView: View {
             .frame(minWidth: 520, minHeight: 460)
         }
         .onAppear {
-            serverManager.start()
+            startServer()
             Task { await modelManager.refreshModels() }
         }
         .onDisappear {

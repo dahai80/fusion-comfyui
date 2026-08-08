@@ -27,7 +27,7 @@ Open `http://localhost:11443` — the ComfyUI frontend connects directly.
 |---|---|---|
 | Phase 1 | ✅ Complete | ComfyUI custom nodes (PyTorch host + MLX compute) |
 | Phase 2 | ✅ Complete | Standalone FastAPI server, ComfyUI protocol, zero PyTorch |
-| Phase 3 | 🔧 In Progress | Spec denoise machinery ✅ (landed, default-off, accel falsified), Radix cache ✅, stats node ✅, NVFP4 blocked (mlx#2962), async dispatch needs fusion-mlx |
+| Phase 3 | 🔧 In Progress | Spec denoise machinery ✅ (landed, default-off, accel falsified), Radix cache ❌ (FALSIFIED — T5 embeddings not prefix-reusable; compile cache covers latency), stats node ✅, NVFP4 blocked (mlx#2962), async dispatch needs fusion-mlx |
 | Phase 4 | 🔧 In Progress | Swift app split ✅, ServerManager/ModelManager ✅, needs packaging |
 
 See [CONSTRUCTION_PLAN.md](CONSTRUCTION_PLAN.md) for full details.
@@ -188,7 +188,7 @@ Phase 1 and Phase 2 upstream issues (all resolved):
 
 Phase 3 status (fusion-mlx machinery landed):
 - Speculative denoising ✅ landed in fusion-mlx (`speculative_denoise.py`: draft-predict + batched-verify), env-gated and default-off. The layer-pruned draft was evaluated and FALSIFIED on SkyReels-V3 R2V 14B (0% acceptance at ε=0.1, no speedup) - machinery stays as infrastructure for a future distilled draft. Stats surface is live: `GET /v1/videos/denoise-stats?model=<name>` + `FusionDenoiseStats` node.
-- Radix KV cache: local `RadixCache` implemented (prefix-tree); upstream diffusion KV reuse still future.
+- Radix KV cache: ❌ FALSIFIED 2026-08-08. `RadixCache` (prefix-tree byte cache, 8 unit tests pass) was intended for prefix-shared T5 embeddings across short-drama shots, but T5 is bidirectional-attention so token i's embedding depends on ALL tokens — a shared text prefix does NOT yield a shared embedding prefix (prefix-tree collapses to exact-match). Measured on real Wan2.1-1.3B: 1st `encode_text`=3.00s, 2nd same-prompt=0.13s, 3rd DIFFERENT prompt=0.13s — the 22x speedup is MLX graph-compile cache, not prompt-key reuse; the "second-shot → 0ms" goal is already met by the compile cache. The class is kept as a correct data structure for a future genuinely-prefix-structured use (e.g. node-output dedup); the T5-embedding application is abandoned.
 - NVFP4 weight reader: blocked on MLX framework issue [mlx#2962](https://github.com/ml-explore/mlx/issues/2962) (not fusion-mlx).
 - Metal async dispatch pipeline: still needs fusion-mlx (split command buffer for CPU/GPU overlap).
 

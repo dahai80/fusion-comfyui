@@ -231,7 +231,7 @@ Load a TTS model as a FUSION_TTS engine wrapper. Uses fusion-mlx TTSEngine if av
 
 | Input | Type | Default | Description |
 |-------|------|---------|-------------|
-| model_name | STRING | mlx-community/kokoro-82m | TTS model name (HF repo or local path) |
+| model_name | STRING | mlx-community/Kokoro-82M-bf16 | TTS model name (HF repo or local path). 旧默认 `mlx-community/kokoro-82m` 在 hf-mirror 404，已自动别名重定向到 `Kokoro-82M-bf16` |
 
 **Output**: FUSION_TTS
 

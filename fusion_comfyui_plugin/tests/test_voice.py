@@ -118,7 +118,10 @@ class TestFusionSaveAudioNode:
         from nodes.voice import FusionSaveAudioNode
         audio = np.random.randn(1, 24000).astype(np.float32) * 0.5
         node = FusionSaveAudioNode()
-        path = node.save(audio, "test_audio", 24000)[0]
+        result = node.save(audio, "test_audio", 24000)
+        path = result["result"][0]
+        assert isinstance(result["ui"]["audio"], list)
+        assert result["ui"]["audio"][0]["filename"].endswith(".wav")
         import os
         assert os.path.exists(path)
         os.unlink(path)
@@ -127,7 +130,9 @@ class TestFusionSaveAudioNode:
         from nodes.voice import FusionSaveAudioNode
         audio = np.zeros((1, 24000), dtype=np.int16)
         node = FusionSaveAudioNode()
-        path = node.save(audio, "test_int16", 24000)[0]
+        result = node.save(audio, "test_int16", 24000)
+        path = result["result"][0]
+        assert isinstance(result["ui"]["audio"], list)
         import os
         assert os.path.exists(path)
         os.unlink(path)
@@ -168,5 +173,14 @@ class TestListTTSModels:
     def test_includes_known(self):
         from nodes.voice import _list_tts_models
         models = _list_tts_models()
+        assert "mlx-community/Kokoro-82M-bf16" in models
         assert "mlx-community/kokoro-82m" in models
         assert "lucasnewman/f5-tts-mlx" in models
+
+    def test_default_is_working_repo(self):
+        from nodes.voice import _DEFAULT_TTS_MODEL
+        assert _DEFAULT_TTS_MODEL == "mlx-community/Kokoro-82M-bf16"
+
+    def test_alias_redirects_old_default(self):
+        from nodes.voice import _TTS_MODEL_ALIASES
+        assert _TTS_MODEL_ALIASES["mlx-community/kokoro-82m"] == "mlx-community/Kokoro-82M-bf16"

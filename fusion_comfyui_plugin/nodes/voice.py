@@ -169,7 +169,24 @@ class FusionVoiceSynthesizeNode:
         if temperature is not None:
             synthesize_kwargs["temperature"] = temperature
 
-        pcm_bytes = await tts_engine.synthesize(**synthesize_kwargs)
+        # kokoro 流式 generate 偶发 [broadcast_shapes] (1,N,1) vs (1,M,9) 对齐错误
+        # (mlx_audio istftnet sine_gen noise 生成形状不匹配), 与文本长度无关, 重试可收敛.
+        # 注意: 此处是 fusion_mlx.TTSEngine 主路径 (非 _MLXAudioTTSEngine 回退), 重试必须包这里.
+        last_err = None
+        pcm_bytes = b""
+        for attempt in range(3):
+            try:
+                pcm_bytes = await tts_engine.synthesize(**synthesize_kwargs)
+                if pcm_bytes:
+                    break
+                last_err = RuntimeError("TTS engine produced no audio output")
+            except Exception as e:
+                last_err = e
+                logger.warning("FusionVoiceSynthesize: synthesize attempt %d failed: %s", attempt + 1, e)
+        if not pcm_bytes:
+            if last_err:
+                raise last_err
+            raise RuntimeError("TTS engine produced no audio output")
 
         sample_rate = getattr(tts_engine, '_sample_rate', 24000)
         if hasattr(tts_engine, '_model') and tts_engine._model is not None:

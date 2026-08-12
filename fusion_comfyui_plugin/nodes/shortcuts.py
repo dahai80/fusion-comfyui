@@ -104,6 +104,8 @@ class FusionImageGenNode:
         raw_arr = result_raw[0]
         if isinstance(raw_arr, np.ndarray):
             image_np = raw_arr.astype(np.float32) / 255.0
+            if image_np.ndim == 3:
+                image_np = image_np[np.newaxis, ...]
         else:
             image_np = _bytes_to_image_array(raw_arr)
         logger.info("FusionImageGen: output shape=%s", image_np.shape)

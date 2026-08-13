@@ -4,7 +4,7 @@ build-backend = "setuptools.backends._legacy:_Backend"
 
 [project]
 name = "fusion-comfyui"
-version = "0.2.5"
+version = "0.2.6"
 description = "Pure MLX ComfyUI server on Apple Silicon — no PyTorch runtime"
 readme = "README.md"
 license = "Apache-2.0"

@@ -11,6 +11,7 @@ Usage:
 
 import json
 import logging
+import os
 import time
 import urllib.request
 import urllib.error
@@ -19,7 +20,8 @@ import pytest
 
 logger = logging.getLogger("test_e2e_workflows")
 
-COMFYUI_URL = "http://127.0.0.1:11443"
+_E2E_PORT = os.environ.get("FUSION_COMFYUI_PORT", "11445")
+COMFYUI_URL = f"http://127.0.0.1:{_E2E_PORT}"
 POLL_INTERVAL = 5
 MAX_POLL_SECONDS = 3600
 
@@ -90,12 +92,12 @@ REQUIRED_SHORTCUT_NODES = {"FusionImageGen", "FusionVideoGen", "FusionSaveVideo"
 @pytest.fixture(scope="session", autouse=True)
 def comfyui_running():
     if not _check_comfyui_alive():
-        pytest.skip("ComfyUI not running on port 11443")
+        pytest.skip(f"ComfyUI not running at {COMFYUI_URL}")
     available = _available_node_types()
     missing = REQUIRED_SHORTCUT_NODES - available
     if missing:
         pytest.skip(
-            f"server on 11443 missing Phase-1 plugin shortcut nodes {sorted(missing)}; "
+            f"server at {COMFYUI_URL} missing Phase-1 plugin shortcut nodes {sorted(missing)}; "
             f"run e2e against ComfyUI phase-1 server (loads fusion_comfyui_plugin nodes)"
         )
 

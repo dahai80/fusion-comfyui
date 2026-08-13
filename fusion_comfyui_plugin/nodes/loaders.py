@@ -288,3 +288,152 @@ class FusionModelLoaderNode:
             model_name, resolved_name, resolved_path, offload_strategy, quant_bit,
         )
         return (pipeline,)
+
+
+class StableCascade_EmptyLatentImage:
+    """Override native StableCascade_EmptyLatentImage.
+    Produces zero stage_c (16ch) + stage_b (4ch) latents with numpy.
+    Stores width/height so KSampler can drive the cascade pipeline size.
+    """
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "width": ("INT", {"default": 1024, "min": 256, "max": 16384, "step": 8}),
+                "height": ("INT", {"default": 1024, "min": 256, "max": 16384, "step": 8}),
+                "compression": ("INT", {"default": 42, "min": 4, "max": 128, "step": 1}),
+                "batch_size": ("INT", {"default": 1, "min": 1, "max": 4096}),
+            }
+        }
+    RETURN_TYPES = ("LATENT", "LATENT")
+    RETURN_NAMES = ("stage_c", "stage_b")
+    FUNCTION = "execute"
+    CATEGORY = "model/latent/stable cascade"
+
+    def execute(self, width, height, compression, batch_size=1):
+        import numpy as np
+        c_latent = np.zeros([batch_size, 16, height // compression, width // compression],
+                            dtype=np.float32)
+        b_latent = np.zeros([batch_size, 4, height // 4, width // 4], dtype=np.float32)
+        logger.info(
+            "StableCascade_EmptyLatentImage: %dx%d comp=%d -> c=%s b=%s",
+            width, height, compression, c_latent.shape, b_latent.shape,
+        )
+        return (
+            {"samples": c_latent, "width": width, "height": height, "compression": compression},
+            {"samples": b_latent, "width": width, "height": height},
+        )
+
+
+class StableCascade_StageC_VAEEncode:
+    """Override native StableCascade_StageC_VAEEncode.
+    Encodes image to stage_c latent via FusionVAEWrapper.encode (no torch).
+    Width/height carried from the source image for KSampler sizing.
+    """
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "vae": ("VAE",),
+                "compression": ("INT", {"default": 42, "min": 4, "max": 128, "step": 1}),
+            }
+        }
+    RETURN_TYPES = ("LATENT", "LATENT")
+    RETURN_NAMES = ("stage_c", "stage_b")
+    FUNCTION = "execute"
+    CATEGORY = "model/latent/stable cascade"
+
+    def execute(self, image, vae, compression):
+        import numpy as np
+        shape = tuple(getattr(image, "shape", (1, 3, 512, 512)))
+        height = shape[-3] if len(shape) >= 3 else 512
+        width = shape[-2] if len(shape) >= 4 else 512
+        nchw = image
+        if hasattr(image, "movedim"):
+            nchw = image.movedim(-1, 1)
+        c_latent = vae.encode(nchw)
+        b_latent = np.zeros([c_latent.shape[0], 4, (height // 8) * 2, (width // 8) * 2],
+                            dtype=np.float32)
+        logger.info(
+            "StableCascade_StageC_VAEEncode: image=%s comp=%d -> c=%s b=%s",
+            shape, compression, c_latent.shape, b_latent.shape,
+        )
+        return (
+            {"samples": c_latent, "width": width, "height": height, "compression": compression},
+            {"samples": b_latent, "width": width, "height": height},
+        )
+
+
+class StableCascade_StageB_Conditioning:
+    """Override native StableCascade_StageB_Conditioning.
+    Attaches stage_c samples onto the conditioning. Handles both the bridge
+    dict conditioning format and the native list-of-tuples format.
+    """
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "conditioning": ("CONDITIONING",),
+                "stage_c": ("LATENT",),
+            }
+        }
+    RETURN_TYPES = ("CONDITIONING",)
+    FUNCTION = "execute"
+    CATEGORY = "model/conditioning/stable cascade"
+
+    def execute(self, conditioning, stage_c):
+        prior = stage_c["samples"]
+        if isinstance(conditioning, dict):
+            d = dict(conditioning)
+            d["stable_cascade_prior"] = prior
+            logger.info("StableCascade_StageB_Conditioning: attached prior %s to dict cond",
+                        getattr(prior, "shape", "?"))
+            return (d,)
+        c = []
+        for t in conditioning:
+            d = t[1].copy()
+            d["stable_cascade_prior"] = prior
+            c.append([t[0], d])
+        logger.info("StableCascade_StageB_Conditioning: attached prior %s to %d native conds",
+                    getattr(prior, "shape", "?"), len(c))
+        return (c,)
+
+
+class StableCascade_SuperResolutionControlnet:
+    """Override native StableCascade_SuperResolutionControlnet.
+    Encodes image via FusionVAEWrapper.encode for the controlnet input and
+    returns zero stage_c/stage_b latents (numpy, no torch).
+    """
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "vae": ("VAE",),
+            }
+        }
+    RETURN_TYPES = ("IMAGE", "LATENT", "LATENT")
+    RETURN_NAMES = ("controlnet_input", "stage_c", "stage_b")
+    FUNCTION = "execute"
+    CATEGORY = "experimental/stable cascade"
+
+    def execute(self, image, vae):
+        import numpy as np
+        shape = tuple(getattr(image, "shape", (1, 3, 512, 512)))
+        height = shape[-3] if len(shape) >= 3 else 512
+        width = shape[-2] if len(shape) >= 4 else 512
+        batch_size = shape[0] if len(shape) >= 4 else 1
+        nchw = image
+        if hasattr(image, "movedim"):
+            nchw = image.movedim(-1, 1)
+        controlnet_input = vae.encode(nchw[:,:,:,:3])
+        c_latent = np.zeros([batch_size, 16, height // 16, width // 16], dtype=np.float32)
+        b_latent = np.zeros([batch_size, 4, height // 2, width // 2], dtype=np.float32)
+        logger.info(
+            "StableCascade_SuperResolutionControlnet: image=%s -> cnet=%s c=%s b=%s",
+            shape, getattr(controlnet_input, "shape", "?"), c_latent.shape, b_latent.shape,
+        )
+        return (controlnet_input,
+                {"samples": c_latent, "width": width, "height": height},
+                {"samples": b_latent, "width": width, "height": height})

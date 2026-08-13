@@ -41,6 +41,10 @@ from .nodes.loaders import (
     VAELoader,
     CheckpointLoaderSimple,
     ImageOnlyCheckpointLoader,
+    StableCascade_EmptyLatentImage,
+    StableCascade_StageC_VAEEncode,
+    StableCascade_StageB_Conditioning,
+    StableCascade_SuperResolutionControlnet,
 )
 from .nodes.conditioning import FusionTextEncoderNode, CLIPTextEncode
 from .nodes.samplers import (
@@ -127,6 +131,11 @@ NODE_CLASS_MAPPINGS = {
     "VAELoader": VAELoader,
     "CheckpointLoaderSimple": CheckpointLoaderSimple,
     "ImageOnlyCheckpointLoader": ImageOnlyCheckpointLoader,
+    # Stable Cascade (native comfy_extras overrides)
+    "StableCascade_EmptyLatentImage": StableCascade_EmptyLatentImage,
+    "StableCascade_StageC_VAEEncode": StableCascade_StageC_VAEEncode,
+    "StableCascade_StageB_Conditioning": StableCascade_StageB_Conditioning,
+    "StableCascade_SuperResolutionControlnet": StableCascade_SuperResolutionControlnet,
     # Image
     "LoadImage": LoadImage,
     "SaveImage": SaveImage,
@@ -264,6 +273,10 @@ _native_overrides = {
     "WanCameraEmbedding": WanCameraEmbedding,
     "WanCameraImageToVideo": WanCameraImageToVideo,
     "WanVaceToVideo": WanVaceToVideo,
+    "StableCascade_EmptyLatentImage": StableCascade_EmptyLatentImage,
+    "StableCascade_StageC_VAEEncode": StableCascade_StageC_VAEEncode,
+    "StableCascade_StageB_Conditioning": StableCascade_StageB_Conditioning,
+    "StableCascade_SuperResolutionControlnet": StableCascade_SuperResolutionControlnet,
     "Note": Note,
     "SaveWEBM": SaveWEBM,
     "SaveAnimatedWEBP": SaveAnimatedWEBP,

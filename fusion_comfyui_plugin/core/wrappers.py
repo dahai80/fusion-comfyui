@@ -91,7 +91,14 @@ class FusionVAEWrapper:
         self.load_device = None
         self.offload_device = None
 
-        logger.info("FusionVAEWrapper: path=%s", model_path)
+        # Stable Cascade Effnet VAE: 16-ch stage_c latent, downscale 4x.
+        # Set when this wrapper backs a stable_cascade checkpoint so the
+        # native StableCascade_StageC_VAEEncode / SuperResolutionControlnet
+        # nodes (which read vae.downscale_ratio / vae.encode) don't crash.
+        self._is_cascade = _is_cascade_name(model_name)
+        self.downscale_ratio = 4 if self._is_cascade else 8
+
+        logger.info("FusionVAEWrapper: path=%s cascade=%s", model_path, self._is_cascade)
 
     def get_engine(self):
         if self._engine is not None:
@@ -108,6 +115,31 @@ class FusionVAEWrapper:
         )
         logger.debug("FusionVAEWrapper: created new engine for %s", self.model_name)
         return self._engine
+
+    def encode(self, x):
+        # Native StableCascade_StageC_VAEEncode / SuperResolutionControlnet
+        # call vae.encode(image_nchw) to produce a stage_c latent (16-ch).
+        # The bridge KSampler regenerates end-to-end from prompt+size, so
+        # the latent content is not consumed — only its shape must be valid
+        # for the graph to execute. Return a zero latent with the Effnet
+        # output shape (N, 16, H//downscale_ratio, W//downscale_ratio).
+        import numpy as np
+        if hasattr(x, "shape"):
+            shape = tuple(x.shape)
+        else:
+            shape = (1, 3, 512, 512)
+        n = shape[0] if len(shape) >= 4 else 1
+        h = shape[2] if len(shape) >= 3 else 512
+        w = shape[3] if len(shape) >= 4 else 512
+        if self._is_cascade:
+            latent = np.zeros((n, 16, h // self.downscale_ratio, w // self.downscale_ratio),
+                              dtype=np.float32)
+            logger.info("FusionVAEWrapper.encode(cascade): %s -> stage_c %s", shape, latent.shape)
+            return latent
+        logger.warning("FusionVAEWrapper.encode: non-cascade VAE encode requested (%s), "
+                       "returning zero latent", shape)
+        return np.zeros((n, 4, h // self.downscale_ratio, w // self.downscale_ratio),
+                        dtype=np.float32)
 
     def __repr__(self):
         return f"<FusionVAE path={self.model_name}>"
@@ -137,6 +169,23 @@ def _infer_model_type(model_name: str) -> str:
     return "image"
 
 
+def _is_cascade_name(model_name: str) -> bool:
+    name = (model_name or "").lower()
+    return "cascade" in name or "wuerstchen" in name
+
+
+_CASCADE_MODEL_DIR = "models--stabilityai--stable-cascade-prior"
+
+
+def _available_cascade_model() -> str | None:
+    import os
+    base = os.path.expanduser("~/.fusion-mlx/models")
+    candidate = os.path.join(base, _CASCADE_MODEL_DIR)
+    if os.path.isdir(candidate):
+        return _CASCADE_MODEL_DIR
+    return None
+
+
 def _available_video_models() -> list:
     import os
     base = os.path.expanduser("~/.fusion-mlx/models")
@@ -164,8 +213,18 @@ def _fallback_model(requested: str) -> str:
     base = os.path.expanduser("~/.fusion-mlx/models")
     if os.path.isdir(os.path.join(base, requested)):
         return requested
-    available = _available_video_models()
     name = requested.lower()
+    # Stable Cascade must NOT fall through to video models (wan/flux).
+    # Route any cascade/wuerstchen checkpoint to the self-contained
+    # fusion-mlx stable_cascade pipeline, which loads prior+decoder+vqgan
+    # from CascadeModelPaths regardless of the stage_b/stage_c filename.
+    if "cascade" in name or "wuerstchen" in name:
+        cascade_dir = _available_cascade_model()
+        if cascade_dir is not None:
+            logger.info("Falling back %s -> %s (stable_cascade pipeline)", requested, cascade_dir)
+            return cascade_dir
+        logger.warning("Stable Cascade checkpoint %s requested but no cascade model installed", requested)
+    available = _available_video_models()
     if "wan" in name and "Wan2.2-5B" in available:
         logger.info("Falling back %s -> Wan2.2-5B (requested not available)", requested)
         return "Wan2.2-5B"
@@ -226,6 +285,15 @@ def _resolve_model_path(model_name: str) -> str:
 
 def _map_checkpoint_to_model_name(ckpt_name: str) -> str:
     name = ckpt_name.lower()
+    # Stable Cascade: stage_b/stage_c checkpoints both route to the
+    # self-contained cascade pipeline. Check before wan/flux/sd.
+    if "cascade" in name or "wuerstchen" in name:
+        cascade_dir = _available_cascade_model()
+        if cascade_dir is not None:
+            logger.info("Mapping cascade ckpt %s -> %s", ckpt_name, cascade_dir)
+            return cascade_dir
+        logger.warning("Cascade ckpt %s mapped but no cascade model installed", ckpt_name)
+        return ckpt_name
     if "ltx" in name and "video" in name:
         return "LTX-Video"
     if "wan" in name:

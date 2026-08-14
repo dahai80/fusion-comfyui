@@ -184,3 +184,87 @@ class TestListTTSModels:
     def test_alias_redirects_old_default(self):
         from nodes.voice import _TTS_MODEL_ALIASES
         assert _TTS_MODEL_ALIASES["mlx-community/kokoro-82m"] == "mlx-community/Kokoro-82M-bf16"
+
+
+class TestFusionVoiceSynthesizeHttpBackend:
+    def test_input_types_has_http_backend(self):
+        from nodes.voice import FusionVoiceSynthesizeNode
+        inputs = FusionVoiceSynthesizeNode.INPUT_TYPES()
+        assert "backend" in inputs["optional"]
+        assert "http" in inputs["optional"]["backend"][0]
+        assert "local" in inputs["optional"]["backend"][0]
+        assert "model_name" in inputs["optional"]
+
+    def test_http_success(self, monkeypatch, tmp_path):
+        import io
+        import wave
+        from nodes.voice import FusionVoiceSynthesizeNode
+
+        monkeypatch.setenv("FUSION_MLX_API_KEY", "test-key")
+        monkeypatch.setenv("FUSION_MLX_BASE", "http://127.0.0.1:11434")
+
+        pcm = np.zeros(24000, dtype=np.int16).tobytes()
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(24000)
+            wf.writeframes(pcm)
+        wav_bytes = buf.getvalue()
+
+        fake_resp = MagicMock()
+        fake_resp.status_code = 200
+        fake_resp.content = wav_bytes
+        fake_resp.text = ""
+
+        fake_client = MagicMock()
+        fake_client.__enter__ = MagicMock(return_value=fake_client)
+        fake_client.__exit__ = MagicMock(return_value=False)
+        fake_client.post = MagicMock(return_value=fake_resp)
+
+        node = FusionVoiceSynthesizeNode()
+        with patch("httpx.Client", return_value=fake_client) as mock_ctor:
+            result = node.synthesize(
+                MagicMock(), "如果把太阳压缩成豌豆",
+                voice="Cherry", backend="http",
+                model_name="Qwen3-TTS-12Hz-1.7B-Base-8bit",
+            )
+
+        assert mock_ctor.called
+        call_kwargs = fake_client.post.call_args
+        assert call_kwargs[0][0].endswith("/v1/audio/speech")
+        body = call_kwargs[1]["json"]
+        assert body["model"] == "Qwen3-TTS-12Hz-1.7B-Base-8bit"
+        assert body["voice"] == "Cherry"
+        assert body["response_format"] == "wav"
+
+        assert len(result) == 2
+        audio_np, path = result
+        assert audio_np.shape[0] == 1
+        assert path.endswith(".wav")
+        import os
+        assert os.path.exists(path)
+        os.unlink(path)
+
+    def test_http_error_raises(self, monkeypatch):
+        from nodes.voice import FusionVoiceSynthesizeNode
+
+        monkeypatch.setenv("FUSION_MLX_API_KEY", "test-key")
+        monkeypatch.setenv("FUSION_MLX_BASE", "http://127.0.0.1:11434")
+
+        fake_resp = MagicMock()
+        fake_resp.status_code = 404
+        fake_resp.text = "Model not found"
+
+        fake_client = MagicMock()
+        fake_client.__enter__ = MagicMock(return_value=fake_client)
+        fake_client.__exit__ = MagicMock(return_value=False)
+        fake_client.post = MagicMock(return_value=fake_resp)
+
+        node = FusionVoiceSynthesizeNode()
+        with patch("httpx.Client", return_value=fake_client):
+            with pytest.raises(RuntimeError, match="404"):
+                node.synthesize(
+                    MagicMock(), "测试文本",
+                    backend="http", model_name="bad-model",
+                )

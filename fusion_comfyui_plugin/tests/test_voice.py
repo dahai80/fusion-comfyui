@@ -268,3 +268,72 @@ class TestFusionVoiceSynthesizeHttpBackend:
                     MagicMock(), "测试文本",
                     backend="http", model_name="bad-model",
                 )
+
+    def test_http_retry_500_then_success(self, monkeypatch):
+        import io
+        import wave
+        from nodes.voice import FusionVoiceSynthesizeNode
+
+        monkeypatch.setenv("FUSION_MLX_API_KEY", "test-key")
+        monkeypatch.setenv("FUSION_MLX_BASE", "http://127.0.0.1:11434")
+
+        pcm = np.zeros(24000, dtype=np.int16).tobytes()
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(24000)
+            wf.writeframes(pcm)
+        wav_bytes = buf.getvalue()
+
+        resp_500 = MagicMock()
+        resp_500.status_code = 500
+        resp_500.text = "Internal server error"
+        resp_200 = MagicMock()
+        resp_200.status_code = 200
+        resp_200.content = wav_bytes
+        resp_200.text = ""
+
+        fake_client = MagicMock()
+        fake_client.__enter__ = MagicMock(return_value=fake_client)
+        fake_client.__exit__ = MagicMock(return_value=False)
+        fake_client.post = MagicMock(side_effect=[resp_500, resp_200])
+
+        node = FusionVoiceSynthesizeNode()
+        with patch("httpx.Client", return_value=fake_client):
+            with patch("time.sleep") as _sleep:
+                result = node.synthesize(
+                    MagicMock(), "如果把太阳压缩成豌豆",
+                    voice="Cherry", backend="http",
+                    model_name="Qwen3-TTS-12Hz-1.7B-Base-8bit",
+                )
+
+        assert fake_client.post.call_count == 2
+        assert len(result) == 2
+        import os
+        os.unlink(result[1])
+
+    def test_http_retry_exhausts_on_persistent_500(self, monkeypatch):
+        from nodes.voice import FusionVoiceSynthesizeNode
+
+        monkeypatch.setenv("FUSION_MLX_API_KEY", "test-key")
+        monkeypatch.setenv("FUSION_MLX_BASE", "http://127.0.0.1:11434")
+
+        resp_500 = MagicMock()
+        resp_500.status_code = 500
+        resp_500.text = "Internal server error"
+
+        fake_client = MagicMock()
+        fake_client.__enter__ = MagicMock(return_value=fake_client)
+        fake_client.__exit__ = MagicMock(return_value=False)
+        fake_client.post = MagicMock(return_value=resp_500)
+
+        node = FusionVoiceSynthesizeNode()
+        with patch("httpx.Client", return_value=fake_client):
+            with patch("time.sleep"):
+                with pytest.raises(RuntimeError, match="500"):
+                    node.synthesize(
+                        MagicMock(), "测试文本",
+                        backend="http", model_name="Qwen3-TTS-12Hz-1.7B-Base-8bit",
+                    )
+        assert fake_client.post.call_count == 3

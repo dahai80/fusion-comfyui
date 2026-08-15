@@ -263,21 +263,40 @@ class FusionVoiceSynthesizeNode:
             url, effective_model, effective_voice, len(text),
         )
 
-        try:
-            with httpx.Client(timeout=300.0, headers=headers) as client:
-                resp = client.post(url, json=payload)
-        except Exception as e:
-            logger.error("FusionVoiceSynthesize[http]: request failed: %s", e)
-            raise
+        # Qwen3-TTS /v1/audio/speech 偶发 500/TimeoutError (Metal 资源争用, 上游 fusion-mlx issue #472).
+        # 500/超时是瞬态, 重试可恢复; 401/404 等非瞬态不重试.
+        max_retries = 3
+        resp = None
+        for attempt in range(1, max_retries + 1):
+            try:
+                with httpx.Client(timeout=300.0, headers=headers) as client:
+                    resp = client.post(url, json=payload)
+            except Exception as e:
+                logger.warning(
+                    "FusionVoiceSynthesize[http]: attempt %d request failed: %s",
+                    attempt, e,
+                )
+                if attempt >= max_retries:
+                    raise
+                import time as _t
+                _t.sleep(2 * attempt)
+                continue
+            if resp.status_code == 200:
+                break
+            transient = resp.status_code >= 500
+            logger.warning(
+                "FusionVoiceSynthesize[http]: attempt %d %s returned %s: %s",
+                attempt, url, resp.status_code, resp.text[:200],
+            )
+            if not transient or attempt >= max_retries:
+                raise RuntimeError(
+                    f"fusion-mlx TTS HTTP {resp.status_code}: {resp.text[:200]}"
+                )
+            import time as _t
+            _t.sleep(2 * attempt)
 
-        if resp.status_code != 200:
-            logger.error(
-                "FusionVoiceSynthesize[http]: %s returned %s: %s",
-                url, resp.status_code, resp.text[:300],
-            )
-            raise RuntimeError(
-                f"fusion-mlx TTS HTTP {resp.status_code}: {resp.text[:200]}"
-            )
+        if resp is None or resp.status_code != 200:
+            raise RuntimeError("fusion-mlx TTS HTTP: no successful response after retries")
 
         wav_bytes = resp.content
         if not wav_bytes:

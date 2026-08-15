@@ -67,6 +67,7 @@ from .nodes.latent import (
 from .nodes.image import LoadImage, SaveImage, PreviewImage
 from .nodes.passthrough import (
     ModelSamplingSD3,
+    ModelSamplingStableCascade,
     ModelSamplingContinuousEDM,
     ModelSamplingFlux,
     BasicGuider,
@@ -159,6 +160,7 @@ NODE_CLASS_MAPPINGS = {
     "LTXVImgToVideo": LTXVImgToVideo,
     # Passthrough (no-op nodes needed by workflows)
     "ModelSamplingSD3": ModelSamplingSD3,
+    "ModelSamplingStableCascade": ModelSamplingStableCascade,
     "ModelSamplingContinuousEDM": ModelSamplingContinuousEDM,
     "ModelSamplingFlux": ModelSamplingFlux,
     "BasicGuider": BasicGuider,
@@ -250,6 +252,7 @@ _native_overrides = {
     "ModelSamplingSD3": ModelSamplingSD3,
     "ModelSamplingContinuousEDM": ModelSamplingContinuousEDM,
     "ModelSamplingFlux": ModelSamplingFlux,
+    "ModelSamplingStableCascade": ModelSamplingStableCascade,
     "BasicGuider": BasicGuider,
     "BasicScheduler": BasicScheduler,
     "KSamplerSelect": KSamplerSelect,
@@ -285,14 +288,20 @@ _native_overrides = {
 try:
     import nodes as _comfy_nodes
     _patched = []
+    _not_found = []
     for _name, _override_cls in _native_overrides.items():
         _native_cls = _comfy_nodes.NODE_CLASS_MAPPINGS.get(_name)
-        if _native_cls is not None and _native_cls.__module__ != _override_cls.__module__:
+        if _native_cls is None:
+            _not_found.append(_name)
+            continue
+        if _native_cls.__module__ != _override_cls.__module__:
             _comfy_nodes.NODE_CLASS_MAPPINGS[_name] = _override_cls
             _override_cls.RELATIVE_PYTHON_MODULE = "custom_nodes.ComfyUI-Fusion-MLX"
             _patched.append(_name)
     if _patched:
         logger.info("Patched %d native node overrides: %s", len(_patched), ", ".join(_patched[:5]))
+    if _not_found:
+        logger.warning("Native node overrides NOT FOUND in NODE_CLASS_MAPPINGS: %s", ", ".join(_not_found))
 except Exception as _e:
     logger.warning("Failed to patch native node overrides: %s", _e)
 
@@ -323,6 +332,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "ModelSamplingSD3": "Model Sampling SD3 (fusion-mlx)",
     "ModelSamplingContinuousEDM": "Model Sampling Continuous EDM (fusion-mlx)",
     "ModelSamplingFlux": "Model Sampling Flux (fusion-mlx)",
+    "ModelSamplingStableCascade": "Model Sampling Stable Cascade (fusion-mlx)",
     "BasicGuider": "Basic Guider (fusion-mlx)",
     "BasicScheduler": "Basic Scheduler (fusion-mlx)",
     "KSamplerSelect": "KSampler Select (fusion-mlx)",

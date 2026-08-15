@@ -95,6 +95,38 @@ async def _generate_monolithic(model_wrapper, positive, negative, latent_image,
         return np.stack(frames, axis=0)
 
     elif model_wrapper.model_type == "image":
+        # Stable Cascade two-KSampler workflow: the prior KSampler (stage_c)
+        # already ran the self-contained fusion-mlx pipeline (prior+decoder+
+        # vqgan) and produced the final decoded RGB image. The decoder
+        # KSampler (stage_b) only needs that image — re-running the whole
+        # pipeline here with cfg=0.0 disables prior CFG and corrupts the
+        # output (bimodal 0/255). Short-circuit: return the attached prior.
+        prior_img = None
+        for cond in (positive, negative):
+            if isinstance(cond, dict):
+                cand = cond.get("stable_cascade_prior")
+                if cand is not None:
+                    prior_img = cand
+                    break
+        if prior_img is not None:
+            arr = np.asarray(prior_img)
+            if arr.dtype != np.float32:
+                arr = arr.astype(np.float32)
+            if arr.max() > 1.5:
+                arr = arr / 255.0
+            # prior KSampler stored samples as 5D (1,1,H,W,3); collapse
+            # leading singleton dims to the 3D (H,W,3) the caller expects.
+            while arr.ndim > 3 and arr.shape[0] == 1:
+                arr = arr[0]
+            if arr.ndim == 3 and arr.shape[2] == 4:
+                arr = arr[:, :, :3]
+            logger.info(
+                "_generate_monolithic image: cascade decoder stage, "
+                "passing through prior KSampler output shape=%s",
+                arr.shape,
+            )
+            return arr
+
         result_raw = await engine._engine.generate(
             prompt=prompt,
             width=width,

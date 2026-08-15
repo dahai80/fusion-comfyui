@@ -28,6 +28,26 @@ class ModelSamplingSD3:
         return (model,)
 
 
+class ModelSamplingStableCascade:
+    """Passthrough — no-op for fusion-mlx (cascade scheduler handled by backend).
+    Overrides the native node which calls model.clone() on FusionModelWrapper."""
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "model": ("MODEL",),
+                "shift": ("FLOAT", {"default": 2.0, "min": 0.0, "max": 100.0, "step": 0.01}),
+            }
+        }
+    RETURN_TYPES = ("MODEL",)
+    FUNCTION = "patch"
+    CATEGORY = "model/advanced"
+
+    def patch(self, model, shift):
+        logger.info("ModelSamplingStableCascade passthrough: shift=%.2f", shift)
+        return (model,)
+
+
 class ModelSamplingContinuousEDM:
     """Passthrough — no-op for fusion-mlx."""
     @classmethod

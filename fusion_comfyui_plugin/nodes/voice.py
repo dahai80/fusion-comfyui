@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 import tempfile
@@ -7,6 +8,43 @@ import wave
 import numpy as np
 
 logger = logging.getLogger("fusion_comfyui.nodes.voice")
+
+_DEFAULT_HTTP_TTS_MODEL = "Qwen3-TTS-12Hz-1.7B-Base-8bit"
+_DEFAULT_HTTP_TTS_VOICE = "Cherry"
+_MLX_SETTINGS_PATH = os.path.expanduser(
+    os.environ.get("FUSION_MLX_SETTINGS", "~/.fusion-mlx/settings.json")
+)
+
+
+def _resolve_mlx_api_key():
+    key = os.environ.get("FUSION_MLX_API_KEY", "").strip()
+    if key:
+        return key
+    try:
+        with open(_MLX_SETTINGS_PATH) as f:
+            data = json.load(f)
+        k = data.get("auth", {}).get("api_key", "")
+        if k:
+            return k
+    except Exception as e:
+        logger.debug("FusionVoice HTTP: read mlx settings api_key failed: %s", e)
+    return ""
+
+
+def _resolve_mlx_base_url():
+    base = os.environ.get("FUSION_MLX_BASE", "").strip()
+    if base:
+        return base.rstrip("/")
+    try:
+        from fusion_mlx.config import get_config
+
+        c = get_config()
+        host = getattr(c, "host", "127.0.0.1") or "127.0.0.1"
+        port = getattr(c, "port", 11434) or 11434
+        return f"http://{host}:{port}"
+    except Exception as e:
+        logger.debug("FusionVoice HTTP: get_config failed, fallback localhost:11434: %s", e)
+        return "http://127.0.0.1:11434"
 
 _KNOWN_TTS_MODELS = [
     "mlx-community/Kokoro-82M-bf16",
@@ -88,6 +126,8 @@ class FusionVoiceSynthesizeNode:
                 "ref_audio": ("STRING", {"default": ""}),
                 "ref_text": ("STRING", {"default": ""}),
                 "temperature": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 2.0, "step": 0.05}),
+                "backend": (["local", "http"], {"default": "local"}),
+                "model_name": ("STRING", {"default": _DEFAULT_HTTP_TTS_MODEL}),
             },
         }
 
@@ -98,16 +138,20 @@ class FusionVoiceSynthesizeNode:
     OUTPUT_NODE = True
 
     def synthesize(self, tts_engine, text, voice="af_heart", speed=1.0,
-                   ref_audio="", ref_text="", temperature=0.7):
+                   ref_audio="", ref_text="", temperature=0.7,
+                   backend="local", model_name=_DEFAULT_HTTP_TTS_MODEL):
         if not text.strip():
             logger.warning("FusionVoiceSynthesize: empty text, returning silence")
             silence = np.zeros((1, 24000), dtype=np.float32)
             return (silence, "")
 
         logger.info(
-            "FusionVoiceSynthesize: text_len=%d voice=%s speed=%.1f ref_audio=%s",
-            len(text), voice, speed, bool(ref_audio),
+            "FusionVoiceSynthesize: backend=%s text_len=%d voice=%s speed=%.1f ref_audio=%s",
+            backend, len(text), voice, speed, bool(ref_audio),
         )
+
+        if backend == "http":
+            return self._synthesize_http(text, voice, speed, model_name)
 
         ref_audio_val = ref_audio if ref_audio.strip() else None
         ref_text_val = ref_text if ref_text.strip() else None
@@ -193,6 +237,88 @@ class FusionVoiceSynthesizeNode:
             sample_rate = getattr(tts_engine._model, 'sample_rate', sample_rate)
 
         return pcm_bytes, sample_rate
+
+    def _synthesize_http(self, text, voice, speed, model_name):
+        import httpx
+
+        base_url = _resolve_mlx_base_url()
+        headers = {"Content-Type": "application/json"}
+        api_key = _resolve_mlx_api_key()
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+            headers["x-api-key"] = api_key
+
+        effective_model = model_name.strip() or _DEFAULT_HTTP_TTS_MODEL
+        effective_voice = voice.strip() or _DEFAULT_HTTP_TTS_VOICE
+        payload = {
+            "model": effective_model,
+            "input": text,
+            "voice": effective_voice,
+            "speed": float(speed),
+            "response_format": "wav",
+        }
+        url = f"{base_url}/v1/audio/speech"
+        logger.info(
+            "FusionVoiceSynthesize[http]: POST %s model=%s voice=%s text_len=%d",
+            url, effective_model, effective_voice, len(text),
+        )
+
+        # Qwen3-TTS /v1/audio/speech 偶发 500/TimeoutError (Metal 资源争用, 上游 fusion-mlx issue #472).
+        # 500/超时是瞬态, 重试可恢复; 401/404 等非瞬态不重试.
+        max_retries = 3
+        resp = None
+        for attempt in range(1, max_retries + 1):
+            try:
+                with httpx.Client(timeout=300.0, headers=headers) as client:
+                    resp = client.post(url, json=payload)
+            except Exception as e:
+                logger.warning(
+                    "FusionVoiceSynthesize[http]: attempt %d request failed: %s",
+                    attempt, e,
+                )
+                if attempt >= max_retries:
+                    raise
+                import time as _t
+                _t.sleep(2 * attempt)
+                continue
+            if resp.status_code == 200:
+                break
+            transient = resp.status_code >= 500
+            logger.warning(
+                "FusionVoiceSynthesize[http]: attempt %d %s returned %s: %s",
+                attempt, url, resp.status_code, resp.text[:200],
+            )
+            if not transient or attempt >= max_retries:
+                raise RuntimeError(
+                    f"fusion-mlx TTS HTTP {resp.status_code}: {resp.text[:200]}"
+                )
+            import time as _t
+            _t.sleep(2 * attempt)
+
+        if resp is None or resp.status_code != 200:
+            raise RuntimeError("fusion-mlx TTS HTTP: no successful response after retries")
+
+        wav_bytes = resp.content
+        if not wav_bytes:
+            raise RuntimeError("FusionVoiceSynthesize[http]: empty response body")
+
+        sample_rate = 24000
+        pcm_body = wav_bytes
+        try:
+            with wave.open(__import__("io").BytesIO(wav_bytes), "rb") as wf:
+                sample_rate = wf.getframerate() or 24000
+                pcm_body = wf.readframes(wf.getnframes())
+        except Exception as e:
+            logger.warning("FusionVoiceSynthesize[http]: parse wav header failed, assume raw pcm: %s", e)
+
+        audio_np = np.frombuffer(pcm_body, dtype=np.int16).astype(np.float32) / 32767.0
+        audio_np = audio_np[np.newaxis, :]
+        output_path = self._save_wav(pcm_body, sample_rate)
+        logger.info(
+            "FusionVoiceSynthesize[http]: ok size=%d dur=%.1fs sr=%d path=%s",
+            len(wav_bytes), audio_np.shape[1] / sample_rate, sample_rate, output_path,
+        )
+        return (audio_np, output_path)
 
     def _save_wav(self, pcm_bytes, sample_rate) -> str:
         output_dir = os.path.join(tempfile.gettempdir(), "fusion_comfyui_audio")

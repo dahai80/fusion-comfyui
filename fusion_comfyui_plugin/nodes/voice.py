@@ -242,7 +242,13 @@ class FusionVoiceSynthesizeNode:
         import httpx
 
         base_url = _resolve_mlx_base_url()
-        headers = {"Content-Type": "application/json"}
+        headers = {
+            "Content-Type": "application/json",
+            # fusion-mlx v0.7.0 (#349) 起默认强制 X-Fusion-Route 头, 缺失即 403 missing_route.
+            # 路由 provenance-only (非鉴权), 直连 mlx 客户端需自行注入, 与 fusion-science/
+            # fusion-design 等直连客户端约定一致. gateway 部署时由 gateway 注入, 此处冗余无害.
+            "X-Fusion-Route": "fusion-comfyui",
+        }
         api_key = _resolve_mlx_api_key()
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"

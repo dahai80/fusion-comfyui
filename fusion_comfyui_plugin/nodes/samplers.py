@@ -12,8 +12,51 @@ logger = logging.getLogger("fusion_comfyui.nodes.samplers")
 _decoded_frames_cache = {}
 
 
+def _stash_init_image(arr: np.ndarray, latent_image: dict) -> None:
+    # Save decoded RGB (H,W,3 in 0..1) as a temp PNG and attach its path to
+    # the latent dict so a downstream KSampler can run img2img from it.
+    if arr.ndim != 3 or arr.shape[2] != 3:
+        return
+    try:
+        import os
+        import tempfile
+
+        from PIL import Image
+
+        rgb = (np.clip(arr, 0.0, 1.0) * 255.0).astype(np.uint8)
+        fd, path = tempfile.mkstemp(suffix=".png", prefix="fusion_i2i_")
+        with os.fdopen(fd, "wb") as fh:
+            Image.fromarray(rgb).save(fh, format="PNG")
+        latent_image["_image_init_path"] = path
+        logger.info("_stash_init_image: saved init image %dx%d -> %s",
+                     rgb.shape[1], rgb.shape[0], path)
+    except Exception:
+        logger.debug("_stash_init_image: failed to stash init image", exc_info=True)
+
+
+def _upscale_init_image(src_path: str, width: int, height: int) -> str:
+    # Pixel-space upscale (Lanczos) of the init image to the target size and
+    # return a new temp PNG path. Lets the engine VAE-encode the resized
+    # image for img2img, sidestepping latent/RGB shape mismatches.
+    from PIL import Image
+
+    img = Image.open(src_path).convert("RGB")
+    if img.size != (width, height):
+        img = img.resize((width, height), Image.LANCZOS)
+    import os
+    import tempfile
+
+    fd, path = tempfile.mkstemp(suffix=".png", prefix="fusion_i2i_up_")
+    with os.fdopen(fd, "wb") as fh:
+        img.save(fh, format="PNG")
+    logger.info("_upscale_init_image: %s -> %dx%d -> %s",
+                src_path, width, height, path)
+    return path
+
+
+
 async def _generate_monolithic(model_wrapper, positive, negative, latent_image,
-                               steps, cfg, seed, width, height, num_frames):
+                               steps, cfg, seed, width, height, num_frames, denoise=1.0):
     engine = model_wrapper.get_engine()
     await engine.ensure_started()
 
@@ -127,16 +170,38 @@ async def _generate_monolithic(model_wrapper, positive, negative, latent_image,
             )
             return arr
 
-        result_raw = await engine._engine.generate(
-            prompt=prompt,
-            width=width,
-            height=height,
-            steps=steps,
-            seed=seed,
-            guidance=cfg,
-            n_images=1,
-            output_format="raw",
-        )
+        # img2img / hires-fix 2nd pass: a prior KSampler stored its decoded
+        # RGB output as a temp PNG in _image_init_path, and denoise<1.0 marks
+        # this as a refinement pass. Upscale the init image (pixel space,
+        # Lanczos) to the target size and run a partial-denoise img2img.
+        init_path = latent_image.get("_image_init_path")
+        is_img2img = init_path is not None and denoise is not None and denoise < 1.0
+        gen_kwargs = {
+            "prompt": prompt,
+            "width": width,
+            "height": height,
+            "steps": steps,
+            "seed": seed,
+            "guidance": cfg,
+            "n_images": 1,
+            "output_format": "raw",
+            "negative_prompt": neg_prompt or None,
+        }
+        if is_img2img:
+            init_png = _upscale_init_image(init_path, width, height)
+            gen_kwargs["edit_image"] = init_png
+            gen_kwargs["image_strength"] = float(denoise)
+            logger.info(
+                "_generate_monolithic image: img2img init=%s strength=%.3f %dx%d",
+                init_png, float(denoise), width, height,
+            )
+        else:
+            logger.info(
+                "_generate_monolithic image: txt2img %dx%d denoise=%.2f",
+                width, height, denoise,
+            )
+
+        result_raw = await engine._engine.generate(**gen_kwargs)
         logger.info("_generate_monolithic image: got %d raw arrays, shapes=%s",
                      len(result_raw), [getattr(r, "shape", "?") for r in result_raw])
         raw_arr = result_raw[0]
@@ -156,6 +221,9 @@ async def _generate_monolithic(model_wrapper, positive, negative, latent_image,
             arr = np.array(img).astype(np.float32) / 255.0
         if arr.ndim == 3 and arr.shape[2] == 4:
             arr = arr[:, :, :3]
+        # Cache the decoded RGB as a temp PNG so a subsequent KSampler can
+        # use it as an img2img init image (hires-fix 2nd pass).
+        _stash_init_image(arr, latent_image)
         return arr
 
     return latent_image["samples"]
@@ -232,7 +300,7 @@ class KSampler:
         result = core.async_utils.run_async(
             _generate_monolithic(
                 model, positive, negative, latent_image,
-                steps, cfg, seed, width, height, num_frames,
+                steps, cfg, seed, width, height, num_frames, denoise=denoise,
             ),
             timeout=3600,
         )
@@ -462,3 +530,88 @@ class FusionKSamplerNode:
         finally:
             await pipeline.unload_dit()
         return result
+
+
+class LatentUpscale:
+    # Override of the native LatentUpscale. When a prior KSampler stashed a
+    # decoded RGB image in _image_init_path (image-model hires-fix), the
+    # samples are RGB (1,1,H,W,3), not a true latent. Native LatentUpscale
+    # would divide by 8 and corrupt it. Here we upscale in pixel space and
+    # record the target pixel height/width in the latent dict so the
+    # downstream KSampler knows the img2img target size. For true latents we
+    # defer to the native implementation.
+
+    upscale_methods = ["nearest-exact", "bilinear", "area", "bicubic", "bislerp"]
+    crop_methods = ["disabled", "center"]
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "samples": ("LATENT",),
+                "upscale_method": (s.upscale_methods,),
+                "width": ("INT", {"default": 512, "min": 0, "max": 8192, "step": 8}),
+                "height": ("INT", {"default": 512, "min": 0, "max": 8192, "step": 8}),
+                "crop": (s.crop_methods,),
+            }
+        }
+
+    RETURN_TYPES = ("LATENT",)
+    FUNCTION = "upscale"
+    CATEGORY = "model/latent"
+
+    def upscale(self, samples, upscale_method, width, height, crop):
+        s = samples.copy()
+        init_path = s.get("_image_init_path")
+        arr = samples["samples"]
+        is_rgb = (
+            init_path is not None
+            and isinstance(arr, np.ndarray)
+            and arr.ndim == 5
+            and arr.shape[-1] == 3
+        )
+        if is_rgb:
+            # Pixel-space upscale of the RGB samples to the requested pixel
+            # size (width/height here are already pixels for the RGB path).
+            if width == 0:
+                width = arr.shape[-2]
+            if height == 0:
+                height = arr.shape[-3]
+            width = max(8, width)
+            height = max(8, height)
+            from PIL import Image
+
+            rgb = np.clip(arr[0, 0], 0.0, 1.0)
+            img = Image.fromarray((rgb * 255.0).astype(np.uint8))
+            if img.size != (width, height):
+                img = img.resize((width, height), Image.LANCZOS)
+            s["samples"] = (np.array(img).astype(np.float32) / 255.0)[
+                np.newaxis, np.newaxis, ...
+            ]
+            s["height"] = height
+            s["width"] = width
+            s["num_frames"] = 1
+            logger.info(
+                "LatentUpscale: img2img RGB path -> %dx%d (init=%s)",
+                width, height, init_path,
+            )
+            return (s,)
+        # True latent path: mirror native behavior (latent space, /8).
+        import comfy.utils
+
+        if width == 0 and height == 0:
+            return (s,)
+        if width == 0:
+            height = max(64, height)
+            width = max(64, round(arr.shape[-1] * height / arr.shape[-2]))
+        elif height == 0:
+            width = max(64, width)
+            height = max(64, round(arr.shape[-2] * width / arr.shape[-1]))
+        else:
+            width = max(64, width)
+            height = max(64, height)
+        s["samples"] = comfy.utils.common_upscale(
+            arr, width // 8, height // 8, upscale_method, crop
+        )
+        return (s,)
+

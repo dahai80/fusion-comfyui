@@ -51,6 +51,7 @@ from .nodes.samplers import (
     FusionKSamplerNode,
     KSampler,
     KSamplerAdvanced,
+    LatentUpscale,
     SamplerCustom,
     SamplerCustomAdvanced,
 )
@@ -148,6 +149,7 @@ NODE_CLASS_MAPPINGS = {
     "KSamplerAdvanced": KSamplerAdvanced,
     "SamplerCustom": SamplerCustom,
     "SamplerCustomAdvanced": SamplerCustomAdvanced,
+    "LatentUpscale": LatentUpscale,
     # VAE
     "VAEDecode": VAEDecode,
     "VAEDecodeTiled": VAEDecodeTiled,
@@ -243,6 +245,7 @@ _native_overrides = {
     "SamplerCustomAdvanced": SamplerCustomAdvanced,
     "VAEDecode": VAEDecode,
     "VAEDecodeTiled": VAEDecodeTiled,
+    "LatentUpscale": LatentUpscale,
     "EmptyLatentImage": EmptyLatentImage,
     "EmptyHunyuanLatentVideo": EmptyHunyuanLatentVideo,
     "EmptyCosmosLatentVideo": EmptyCosmosLatentVideo,

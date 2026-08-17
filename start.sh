@@ -15,6 +15,12 @@ HEALTH_TIMEOUT="${FUSION_HEALTH_TIMEOUT:-60}"
 export HF_MIRROR="${HF_MIRROR:-https://hf-mirror.com}"
 export PYTORCH_ENABLE_MPS_FALLBACK="${PYTORCH_ENABLE_MPS_FALLBACK:-1}"
 export FUSION_OUTPUT_DIR="${FUSION_OUTPUT_DIR:-$PROJECT_DIR/output}"
+# Match fusion-mlx's model cache so hf_hub_download finds already-downloaded
+# models (SD1.5, etc.) under ~/.fusion-mlx/models without re-downloading.
+export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-$HOME/.fusion-mlx/models}"
+# Image-gen per-call timeout (fusion-mlx #481). SD1.5 1024 img2img (hires-fix
+# 2nd pass) can exceed the 600s default on Apple Silicon.
+export FUSION_IMAGE_TIMEOUT="${FUSION_IMAGE_TIMEOUT:-3600}"
 
 mkdir -p "$RUN_DIR"
 

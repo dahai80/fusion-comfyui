@@ -558,3 +558,43 @@ class TestFusionKSamplerNode:
              patch("core.async_utils.run_async", side_effect=RuntimeError("denoise fail")):
             with pytest.raises(RuntimeError):
                 node.sample(pipeline, positive, negative, latent, 20, 6.0, 42, 1024, 1024, 1)
+
+
+class TestLatentUpscaleOverride:
+    def test_rgb_path_upscales_in_pixel_space(self):
+        from nodes.samplers import LatentUpscale
+        rgb = np.random.rand(64, 64, 3).astype(np.float32)
+        samples = {"samples": rgb[np.newaxis, np.newaxis, ...], "_image_init_path": "/tmp/x.png"}
+        node = LatentUpscale()
+        result = node.upscale(samples, "bicubic", 128, 128, "disabled")
+        arr = result[0]["samples"]
+        assert arr.ndim == 5 and arr.shape[-1] == 3
+        assert arr.shape[-3] == 128 and arr.shape[-2] == 128
+        assert result[0]["width"] == 128 and result[0]["height"] == 128
+        assert result[0]["num_frames"] == 1
+
+    def test_rgb_path_clamps_out_of_range(self):
+        from nodes.samplers import LatentUpscale
+        rgb = np.full((32, 32, 3), 2.0, dtype=np.float32)
+        samples = {"samples": rgb[np.newaxis, np.newaxis, ...], "_image_init_path": "/tmp/x.png"}
+        node = LatentUpscale()
+        result = node.upscale(samples, "bilinear", 64, 64, "disabled")
+        assert result[0]["samples"].max() <= 1.0
+
+    def test_true_latent_path_defers_to_native(self):
+        import sys
+        import types
+        from nodes.samplers import LatentUpscale
+        latent = np.zeros((1, 4, 64, 64), dtype=np.float32)
+        samples = {"samples": latent}
+        node = LatentUpscale()
+        fake_common_upscale = MagicMock(return_value=latent)
+        fake_utils = types.ModuleType("comfy.utils")
+        fake_utils.common_upscale = fake_common_upscale
+        fake_comfy = types.ModuleType("comfy")
+        fake_comfy.utils = fake_utils
+        with patch.dict(sys.modules, {"comfy": fake_comfy, "comfy.utils": fake_utils}):
+            node.upscale(samples, "bicubic", 512, 512, "disabled")
+        assert fake_common_upscale.called
+        args = fake_common_upscale.call_args[0]
+        assert args[1] == 64 and args[2] == 64

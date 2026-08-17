@@ -53,6 +53,7 @@ _KNOWN_CHECKPOINTS = [
     "svd.safetensors",
     "svd_xt.safetensors",
     "sd_xl_1.0.safetensors",
+    "v1-5-pruned-emaonly.safetensors",
 ]
 
 

@@ -271,6 +271,23 @@ def _resolve_model_path(model_name: str) -> str:
     for c in candidates:
         if os.path.isdir(c):
             return c
+    # HF hub cache layout: ~/.fusion-mlx/models/models--{org}--{name}/.
+    # SD1.5 and other HF-cached image models live here as a snapshot tree,
+    # not a plain directory, so the isdir() checks above miss them. Detect
+    # the cache dir and return the literal repo id — the downstream engine
+    # (e.g. SD15Pipeline) resolves components via hf_hub_download against
+    # HUGGINGFACE_HUB_CACHE. Returning the repo id here also prevents
+    # _fallback_model from mis-routing SD1.5 to an available video model.
+    hf_cache = os.path.expanduser(
+        os.environ.get("HUGGINGFACE_HUB_CACHE", "~/.fusion-mlx/models")
+    )
+    cache_slug = "models--" + model_name.replace("/", "--")
+    if os.path.isdir(os.path.join(hf_cache, cache_slug)):
+        logger.info(
+            "_resolve_model_path: HF cache hit %s -> %s (repo id, no fallback)",
+            model_name, cache_slug,
+        )
+        return model_name
     resolved = _fallback_model(model_name)
     if resolved != model_name:
         for c in [
@@ -316,8 +333,11 @@ def _map_checkpoint_to_model_name(ckpt_name: str) -> str:
             return "stable-video-diffusion-img2vid-xt"
         logger.info("Mapping SVD checkpoint %s -> stable-video-diffusion-img2vid", ckpt_name)
         return "stable-video-diffusion-img2vid"
-    if any(k in name for k in ("sd_xl", "sdxl", "stable_diffusion_xl", "sd15", "stable_diffusion")):
-        logger.info("Mapping SD checkpoint %s -> FLUX.2-klein-base-4B (no SD backend)", ckpt_name)
+    if any(k in name for k in ("sd15", "sd-v1-5", "stable-diffusion-v1-5", "v1-5-pruned", "v1-5")):
+        logger.info("Mapping SD1.5 checkpoint %s -> runwayml/stable-diffusion-v1-5", ckpt_name)
+        return "runwayml/stable-diffusion-v1-5"
+    if any(k in name for k in ("sd_xl", "sdxl", "stable_diffusion_xl", "stable_diffusion")):
+        logger.info("Mapping SDXL checkpoint %s -> FLUX.2-klein-base-4B (no SDXL backend)", ckpt_name)
         return "FLUX.2-klein-base-4B"
     return ckpt_name
 

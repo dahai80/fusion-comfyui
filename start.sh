@@ -16,6 +16,10 @@ export HF_MIRROR="${HF_MIRROR:-https://hf-mirror.com}"
 export PYTORCH_ENABLE_MPS_FALLBACK="${PYTORCH_ENABLE_MPS_FALLBACK:-1}"
 export FUSION_OUTPUT_DIR="${FUSION_OUTPUT_DIR:-$PROJECT_DIR/output}"
 
+# 运维修补：清掉 shell 继承的 FUSION_MLX_API_KEY（可能过期 → TTS http backend 401）。
+# 统一走 ~/.fusion-mlx/settings.json auth.api_key，与 mlx daemon 同源。
+unset FUSION_MLX_API_KEY
+
 mkdir -p "$RUN_DIR"
 
 log() { echo "[start.sh] $*"; }

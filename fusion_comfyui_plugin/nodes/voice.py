@@ -269,8 +269,9 @@ class FusionVoiceSynthesizeNode:
             url, effective_model, effective_voice, len(text),
         )
 
-        # Qwen3-TTS /v1/audio/speech 偶发 500/TimeoutError (Metal 资源争用, 上游 fusion-mlx issue #472).
-        # 500/超时是瞬态, 重试可恢复; 401/404 等非瞬态不重试.
+        # Qwen3-TTS /v1/audio/speech 偶发 500/503/TimeoutError (Metal 资源争用,
+        # 上游 fusion-mlx issue #472, PR #479 将 timeout 改为返回 503+Retry-After).
+        # 5xx/超时是瞬态, 重试可恢复; 401/404 等非瞬态不重试.
         max_retries = 3
         resp = None
         for attempt in range(1, max_retries + 1):

@@ -22,6 +22,10 @@ export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-$HOME/.fusion-mlx/models}
 # 2nd pass) can exceed the 600s default on Apple Silicon.
 export FUSION_IMAGE_TIMEOUT="${FUSION_IMAGE_TIMEOUT:-3600}"
 
+# 运维修补：清掉 shell 继承的 FUSION_MLX_API_KEY（可能过期 → TTS http backend 401）。
+# 统一走 ~/.fusion-mlx/settings.json auth.api_key，与 mlx daemon 同源。
+unset FUSION_MLX_API_KEY
+
 mkdir -p "$RUN_DIR"
 
 log() { echo "[start.sh] $*"; }

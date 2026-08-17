@@ -155,6 +155,11 @@ class TestMapCheckpoint:
         assert _map_checkpoint_to_model_name("svd.safetensors") == "stable-video-diffusion-img2vid"
         assert _map_checkpoint_to_model_name("svd_xt.safetensors") == "stable-video-diffusion-img2vid-xt"
 
+    def test_sd2(self):
+        from core.wrappers import _map_checkpoint_to_model_name
+        assert _map_checkpoint_to_model_name("v2-1_768-ema-pruned.ckpt") == "sd2-community/stable-diffusion-2-1"
+        assert _map_checkpoint_to_model_name("768-v-ema.yaml") == "sd2-community/stable-diffusion-2-1"
+
     def test_sd15(self):
         from core.wrappers import _map_checkpoint_to_model_name
         assert _map_checkpoint_to_model_name("v1-5-pruned-emaonly.safetensors") == "runwayml/stable-diffusion-v1-5"

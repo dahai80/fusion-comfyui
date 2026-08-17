@@ -333,6 +333,24 @@ def _map_checkpoint_to_model_name(ckpt_name: str) -> str:
             return "stable-video-diffusion-img2vid-xt"
         logger.info("Mapping SVD checkpoint %s -> stable-video-diffusion-img2vid", ckpt_name)
         return "stable-video-diffusion-img2vid"
+    if any(
+        k in name
+        for k in (
+            "v2-1",
+            "sd2-1",
+            "sd2.1",
+            "sd21",
+            "stable-diffusion-2",
+            "768-v",
+            "768v",
+            "768-ema",
+        )
+    ):
+        logger.info(
+            "Mapping SD2.1 checkpoint %s -> sd2-community/stable-diffusion-2-1",
+            ckpt_name,
+        )
+        return "sd2-community/stable-diffusion-2-1"
     if any(k in name for k in ("sd15", "sd-v1-5", "stable-diffusion-v1-5", "v1-5-pruned", "v1-5")):
         logger.info("Mapping SD1.5 checkpoint %s -> runwayml/stable-diffusion-v1-5", ckpt_name)
         return "runwayml/stable-diffusion-v1-5"

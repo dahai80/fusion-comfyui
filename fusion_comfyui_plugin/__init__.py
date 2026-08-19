@@ -95,6 +95,7 @@ from .nodes.passthrough import (
     WanCameraImageToVideo,
     WanVaceToVideo,
     Note,
+    MarkdownNote,
 )
 from .nodes.shortcuts import FusionImageGenNode, FusionVideoGenNode, FusionImageToVideoNode, FusionIdentityPipelineNode
 from .nodes.video_io import FusionSaveVideoNode, FusionVideoConcatNode, SaveWEBM, SaveAnimatedWEBP
@@ -189,6 +190,7 @@ NODE_CLASS_MAPPINGS = {
     "WanCameraImageToVideo": WanCameraImageToVideo,
     "WanVaceToVideo": WanVaceToVideo,
     "Note": Note,
+    "MarkdownNote": MarkdownNote,
     # Output nodes (native uses torch, we use PyAV/PIL)
     "SaveWEBM": SaveWEBM,
     "SaveAnimatedWEBP": SaveAnimatedWEBP,
@@ -284,6 +286,7 @@ _native_overrides = {
     "StableCascade_StageB_Conditioning": StableCascade_StageB_Conditioning,
     "StableCascade_SuperResolutionControlnet": StableCascade_SuperResolutionControlnet,
     "Note": Note,
+    "MarkdownNote": MarkdownNote,
     "SaveWEBM": SaveWEBM,
     "SaveAnimatedWEBP": SaveAnimatedWEBP,
 }

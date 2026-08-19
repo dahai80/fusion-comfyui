@@ -64,3 +64,16 @@ def to_image_array(data) -> np.ndarray:
 
     logger.debug("to_image_array: shape=%s dtype=%s", raw.shape, raw.dtype)
     return raw
+
+
+def to_image_tensor(data):
+    # ComfyUI v0.28 SaveVideo/CreateVideo/SaveImage expect a torch IMAGE
+    # tensor (call .clamp().byte().cpu() on each frame). Our MLX decode path
+    # produces numpy; wrap to a CPU torch tensor to satisfy the IMAGE contract.
+    # torch is only a CPU dtype wrapper here (inference stays on MLX/Metal).
+    import torch
+
+    arr = to_image_array(data)
+    tensor = torch.from_numpy(np.ascontiguousarray(arr)).float()
+    logger.debug("to_image_tensor: shape=%s dtype=%s", tuple(tensor.shape), tensor.dtype)
+    return tensor

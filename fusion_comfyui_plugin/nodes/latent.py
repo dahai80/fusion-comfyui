@@ -100,9 +100,8 @@ class Wan22ImageToVideoLatent:
         if start_image is not None:
             import tempfile
             from PIL import Image as PILImage
-            img_arr = start_image
-            if isinstance(img_arr, mx.array):
-                img_arr = np.array(img_arr)
+            from core.bridge import to_numpy
+            img_arr = to_numpy(start_image)
             if img_arr.ndim == 4:
                 img_arr = img_arr[0]
             pil_img = PILImage.fromarray((np.clip(img_arr, 0, 1) * 255).astype(np.uint8))
@@ -150,9 +149,8 @@ class WanImageToVideo:
         if start_image is not None:
             import tempfile
             from PIL import Image as PILImage
-            img_arr = start_image
-            if isinstance(img_arr, mx.array):
-                img_arr = np.array(img_arr)
+            from core.bridge import to_numpy
+            img_arr = to_numpy(start_image)
             if img_arr.ndim == 4:
                 img_arr = img_arr[0]
             pil_img = PILImage.fromarray((np.clip(img_arr, 0, 1) * 255).astype(np.uint8))
@@ -197,9 +195,8 @@ class LTXVImgToVideo:
         if image is not None:
             import tempfile
             from PIL import Image as PILImage
-            img_arr = image
-            if isinstance(img_arr, mx.array):
-                img_arr = np.array(img_arr)
+            from core.bridge import to_numpy
+            img_arr = to_numpy(image)
             if img_arr.ndim == 4:
                 img_arr = img_arr[0]
             pil_img = PILImage.fromarray((np.clip(img_arr, 0, 1) * 255).astype(np.uint8))

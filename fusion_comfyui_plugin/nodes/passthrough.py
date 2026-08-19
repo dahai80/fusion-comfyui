@@ -344,9 +344,8 @@ class CosmosImageToVideoLatent:
         if start_image is not None:
             import tempfile
             from PIL import Image as PILImage
-            img_arr = start_image
-            if isinstance(img_arr, mx.array):
-                img_arr = np.array(img_arr)
+            from core.bridge import to_numpy
+            img_arr = to_numpy(start_image)
             if img_arr.ndim == 4:
                 img_arr = img_arr[0]
             pil_img = PILImage.fromarray((np.clip(img_arr, 0, 1) * 255).astype(np.uint8))
@@ -389,9 +388,8 @@ class CosmosPredict2ImageToVideoLatent:
         if start_image is not None:
             import tempfile
             from PIL import Image as PILImage
-            img_arr = start_image
-            if isinstance(img_arr, mx.array):
-                img_arr = np.array(img_arr)
+            from core.bridge import to_numpy
+            img_arr = to_numpy(start_image)
             if img_arr.ndim == 4:
                 img_arr = img_arr[0]
             pil_img = PILImage.fromarray((np.clip(img_arr, 0, 1) * 255).astype(np.uint8))
@@ -681,9 +679,8 @@ class WanCameraImageToVideo:
         if start_image is not None:
             import tempfile
             from PIL import Image as PILImage
-            img_arr = start_image
-            if isinstance(img_arr, mx.array):
-                img_arr = np.array(img_arr)
+            from core.bridge import to_numpy
+            img_arr = to_numpy(start_image)
             if img_arr.ndim == 4:
                 img_arr = img_arr[0]
             pil_img = PILImage.fromarray((np.clip(img_arr, 0, 1) * 255).astype(np.uint8))
@@ -813,7 +810,7 @@ class WanVaceToVideo:
 
 
 class Note:
-    """Passthrough — UI annotation node, no execution effect."""
+    # Passthrough — UI annotation node, no execution effect.
     @classmethod
     def INPUT_TYPES(cls):
         return {"required": {}, "hidden": {}}
@@ -824,4 +821,21 @@ class Note:
 
     def annotate(self, **kwargs):
         logger.info("Note passthrough")
+        return {}
+
+
+class MarkdownNote:
+    # Passthrough — UI markdown annotation node (workflow_templates use it for
+    # model-link docs). No inputs/outputs, no execution effect; registered so
+    # prompt validation does not 400 on missing_node_type.
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {}, "hidden": {}}
+    RETURN_TYPES = ()
+    OUTPUT_NODE = True
+    FUNCTION = "annotate"
+    CATEGORY = "utils"
+
+    def annotate(self, **kwargs):
+        logger.info("MarkdownNote passthrough")
         return {}

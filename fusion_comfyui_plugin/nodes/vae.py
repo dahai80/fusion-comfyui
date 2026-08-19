@@ -23,7 +23,7 @@ class VAEDecode:
 
     def decode(self, vae, samples):
         from core.wrappers import FusionVAEWrapper
-        from core.bridge import to_mlx_array, to_image_array
+        from core.bridge import to_mlx_array, to_image_tensor
         from core.lifecycle import FusionMemoryGuardian
 
         FusionMemoryGuardian.maybe_purge()
@@ -33,20 +33,20 @@ class VAEDecode:
             logger.info("VAEDecode: monolithic path, passing through decoded frames shape=%s", frames.shape)
             if isinstance(frames, np.ndarray):
                 if frames.ndim == 4:
-                    return (frames,)
+                    return (to_image_tensor(frames),)
                 elif frames.ndim == 3:
-                    return (frames[np.newaxis, ...],)
+                    return (to_image_tensor(frames[np.newaxis, ...]),)
                 elif frames.ndim == 5:
-                    return (frames[0],)
+                    return (to_image_tensor(frames[0]),)
             elif isinstance(frames, mx.array):
                 arr = np.array(frames)
                 if arr.ndim == 4:
-                    return (arr,)
+                    return (to_image_tensor(arr),)
                 elif arr.ndim == 3:
-                    return (arr[np.newaxis, ...],)
+                    return (to_image_tensor(arr[np.newaxis, ...]),)
                 elif arr.ndim == 5:
-                    return (arr[0],)
-            return (frames,)
+                    return (to_image_tensor(arr[0]),)
+            return (to_image_tensor(frames),)
 
         if "_decoded_frames_key" in samples:
             from .samplers import _decoded_frames_cache
@@ -56,19 +56,19 @@ class VAEDecode:
                 logger.info("VAEDecode: monolithic cache path, passing through decoded frames shape=%s", frames.shape)
                 if isinstance(frames, np.ndarray):
                     if frames.ndim == 4:
-                        return (frames,)
+                        return (to_image_tensor(frames),)
                     elif frames.ndim == 3:
-                        return (frames[np.newaxis, ...],)
+                        return (to_image_tensor(frames[np.newaxis, ...]),)
                     elif frames.ndim == 5:
-                        return (frames[0],)
+                        return (to_image_tensor(frames[0]),)
                 elif isinstance(frames, mx.array):
                     arr = np.array(frames)
                     if arr.ndim == 4:
-                        return (arr,)
+                        return (to_image_tensor(arr),)
                     elif arr.ndim == 3:
-                        return (arr[np.newaxis, ...],)
+                        return (to_image_tensor(arr[np.newaxis, ...]),)
                     elif arr.ndim == 5:
-                        return (arr[0],)
+                        return (to_image_tensor(arr[0]),)
             else:
                 logger.warning("VAEDecode: _decoded_frames_key found but no cached frames")
 
@@ -93,15 +93,15 @@ class VAEDecode:
 
         if isinstance(decoded, mx.array):
             mx.eval(decoded)
-            image_np = to_image_array(decoded)
+            image_t = to_image_tensor(decoded)
         elif isinstance(decoded, np.ndarray):
-            image_np = decoded
+            image_t = to_image_tensor(decoded)
         else:
             logger.warning("VAEDecode: unexpected decode result type %s", type(decoded))
-            image_np = np.zeros((1, 512, 512, 3), dtype=np.float32)
+            image_t = to_image_tensor(np.zeros((1, 512, 512, 3), dtype=np.float32))
 
-        logger.info("VAEDecode: output shape=%s dtype=%s", image_np.shape, image_np.dtype)
-        return (image_np,)
+        logger.info("VAEDecode: output shape=%s dtype=%s", tuple(image_t.shape), image_t.dtype)
+        return (image_t,)
 
     async def _decode_via_engine(self, engine, mlx_latent):
         await engine.ensure_started()
@@ -133,7 +133,7 @@ class VAEDecodeTiled:
 
     def decode(self, vae, samples, tile_size=512, overlap=64, temporal_size=64, temporal_overlap=8):
         from core.wrappers import FusionVAEWrapper
-        from core.bridge import to_mlx_array, to_image_array
+        from core.bridge import to_mlx_array, to_image_tensor
         from core.lifecycle import FusionMemoryGuardian
 
         FusionMemoryGuardian.maybe_purge()
@@ -166,15 +166,15 @@ class VAEDecodeTiled:
 
         if isinstance(decoded, mx.array):
             mx.eval(decoded)
-            image_np = to_image_array(decoded)
+            image_t = to_image_tensor(decoded)
         elif isinstance(decoded, np.ndarray):
-            image_np = decoded
+            image_t = to_image_tensor(decoded)
         else:
             logger.warning("VAEDecodeTiled: unexpected result type %s", type(decoded))
-            image_np = np.zeros((1, 512, 512, 3), dtype=np.float32)
+            image_t = to_image_tensor(np.zeros((1, 512, 512, 3), dtype=np.float32))
 
-        logger.info("VAEDecodeTiled: output shape=%s dtype=%s", image_np.shape, image_np.dtype)
-        return (image_np,)
+        logger.info("VAEDecodeTiled: output shape=%s dtype=%s", tuple(image_t.shape), image_t.dtype)
+        return (image_t,)
 
     async def _decode_tiled_via_engine(self, engine, mlx_latent, tile_size):
         await engine.ensure_started()
@@ -202,7 +202,7 @@ class FusionVAEDecoderNode:
     CATEGORY = "Fusion-MLX/VAE"
 
     def decode(self, pipeline, latent, tile_sample_min_size=256):
-        from core.bridge import to_mlx_array, to_image_array
+        from core.bridge import to_mlx_array, to_image_tensor
         from core.lifecycle import FusionMemoryGuardian
 
         FusionMemoryGuardian.maybe_purge()
@@ -221,14 +221,14 @@ class FusionVAEDecoderNode:
             raise
 
         mx.eval(decoded_mlx)
-        image_np = to_image_array(decoded_mlx)
+        image_t = to_image_tensor(decoded_mlx)
 
         logger.info(
             "FusionVAEDecoder: output shape=%s dtype=%s",
-            image_np.shape, image_np.dtype,
+            tuple(image_t.shape), image_t.dtype,
         )
 
-        return (image_np,)
+        return (image_t,)
 
     async def _decode_staged(self, pipeline, mlx_latent, tile_sample_min_size):
         await pipeline.load_vae()

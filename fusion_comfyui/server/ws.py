@@ -32,7 +32,13 @@ async def send_to_client(client_id: str, msg: dict):
 async def websocket_handler(ws: WebSocket, client_id: str = ""):
     await ws.accept()
     cid = register_client(ws, client_id or None)
-    await ws.send_json({"type": "status", "data": {"status": "connected", "client_id": cid}})
+    await ws.send_json({
+        "type": "status",
+        "data": {
+            "status": {"exec_info": {"queue_remaining": 0}},
+            "sid": cid,
+        },
+    })
     try:
         while True:
             raw = await ws.receive_text()

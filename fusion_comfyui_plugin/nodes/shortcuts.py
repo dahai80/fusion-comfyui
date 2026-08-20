@@ -15,6 +15,37 @@ logger = logging.getLogger("fusion_comfyui.nodes.shortcuts")
 _pulid_cache = {}
 
 
+def _raw_shape(raw) -> tuple:
+    if isinstance(raw, np.ndarray):
+        return tuple(raw.shape)
+    try:
+        img = Image.open(io.BytesIO(raw))
+        return img.size[::-1] + (len(img.getbands()),)
+    except Exception:
+        return ()
+
+
+def _raw_width_collapsed(raw, width: int, height: int) -> bool:
+    # Upstream raw output collapses width to a tiny value (e.g. 3px) while
+    # height stays correct. Flag any spatial dim well below the request.
+    threshold_w = min(width * 0.5, 64)
+    threshold_h = min(height * 0.5, 64)
+    try:
+        if isinstance(raw, np.ndarray):
+            if raw.ndim == 3:
+                h, w, _c = raw.shape
+            elif raw.ndim == 2:
+                h, w = raw.shape
+            else:
+                return False
+            return w < threshold_w or h < threshold_h
+        img = Image.open(io.BytesIO(raw))
+        w, h = img.size
+        return w < threshold_w or h < threshold_h
+    except Exception:
+        return False
+
+
 def _bytes_to_image_array(image_bytes: bytes) -> np.ndarray:
     img = Image.open(io.BytesIO(image_bytes))
     arr = np.array(img).astype(np.float32) / 255.0
@@ -91,15 +122,30 @@ class FusionImageGenNode:
             len(prompt), width, height, steps, cfg, seed,
         )
 
-        try:
-            result_raw = core.async_utils.run_async(
-                self._generate_image(pipeline, prompt, negative_prompt,
-                                     width, height, steps, cfg, seed),
-                timeout=600,
-            )
-        except Exception as e:
-            logger.error("FusionImageGen: failed: %s", e)
-            raise
+        # Upstream engine occasionally returns a width-collapsed raw array
+        # (e.g. shape (H,3,3)) for image gen. Detect and retry with a fresh
+        # seed instead of emitting a degenerate black image. See issue #37.
+        max_retries = 3
+        cur_seed = seed
+        result_raw = None
+        for attempt in range(max_retries + 1):
+            try:
+                result_raw = core.async_utils.run_async(
+                    self._generate_image(pipeline, prompt, negative_prompt,
+                                         width, height, steps, cfg, cur_seed),
+                    timeout=600,
+                )
+            except Exception as e:
+                logger.error("FusionImageGen: failed (attempt %d): %s", attempt + 1, e)
+                raise
+            if attempt < max_retries and _raw_width_collapsed(result_raw[0], width, height):
+                logger.warning(
+                    "FusionImageGen: width collapse detected attempt=%d shape=%s requested=%dx%d; retrying with seed %d",
+                    attempt + 1, _raw_shape(result_raw[0]), width, height, cur_seed + 1,
+                )
+                cur_seed += 1
+                continue
+            break
 
         raw_arr = result_raw[0]
         if isinstance(raw_arr, np.ndarray):

@@ -18,4 +18,87 @@
           el.style.background = bg
           el.style.color = fg
         }
-      })()</script><div id="vue-app"></div></body></html>
+      })()</script><div id="vue-app"></div><script>(function () {
+    var ID_MAP = {
+        'queue-button': 'queue-prompt',
+        'queue-front-button': 'queue-front',
+        'comfy-view-queue-button': 'view-queue',
+        'comfy-view-history-button': 'view-history',
+        'comfy-save-button': 'save',
+        'comfy-load-button': 'load',
+        'comfy-refresh-button': 'refresh',
+        'comfy-clear-button': 'clear',
+        'comfy-load-default-button': 'load-default',
+        'comfy-reset-view-button': 'reset-view',
+        'comfy-clipspace-button': 'clipspace',
+        'comfy-dev-save-api-button': 'save-api'
+    };
+    var TEXT_MAP = {
+        '⚙️': 'settings',
+        'Queue Prompt': 'queue-prompt',
+        'Queue Front': 'queue-front',
+        'View Queue': 'view-queue',
+        'View History': 'view-history'
+    };
+    var LABEL_MAP = {
+        'queue-prompt': 'Queue Prompt',
+        'queue-front': 'Queue Front',
+        'view-queue': 'View Queue',
+        'view-history': 'View History',
+        'settings': 'Settings',
+        'save': 'Save',
+        'load': 'Load',
+        'refresh': 'Refresh',
+        'clear': 'Clear',
+        'load-default': 'Load Default',
+        'reset-view': 'Reset View',
+        'clipspace': 'Clipspace',
+        'save-api': 'Save (API Format)'
+    };
+    var stamped = new WeakSet();
+    var readyFired = false;
+    var _obs = null;
+    function stampOne(btn) {
+        if (stamped.has(btn)) return;
+        var testid = null;
+        if (btn.id && ID_MAP[btn.id]) testid = ID_MAP[btn.id];
+        if (!testid) {
+            var t = (btn.textContent || '').trim();
+            if (TEXT_MAP[t]) testid = TEXT_MAP[t];
+        }
+        if (!testid) return;
+        stamped.add(btn);
+        if (!btn.getAttribute('data-testid')) btn.setAttribute('data-testid', testid);
+        if (!btn.getAttribute('aria-label')) btn.setAttribute('aria-label', LABEL_MAP[testid] || testid);
+    }
+    function stampAll() {
+        var roots = document.querySelectorAll('.comfyui-body-top, .comfy-menu, .comfyui-body');
+        if (!roots.length) return false;
+        roots.forEach(function (root) {
+            root.querySelectorAll('button, [role=button]').forEach(stampOne);
+        });
+        return !!document.querySelector('[data-testid=queue-prompt],[data-testid=settings]');
+    }
+    function fireReady() {
+        if (readyFired) return;
+        if (!stampAll()) return;
+        readyFired = true;
+        if (_obs) { _obs.disconnect(); _obs = null; }
+        window.dispatchEvent(new CustomEvent('comfy:ui-ready', { detail: { time: performance.now() } }));
+        console.info('[fusion-comfyui] comfy:ui-ready fired; toolbar testids stamped');
+    }
+    if (stampAll()) {
+        fireReady();
+    } else {
+        _obs = new MutationObserver(function () { fireReady(); });
+        _obs.observe(document.body, { childList: true, subtree: true });
+        setTimeout(function () { if (_obs) { _obs.disconnect(); _obs = null; console.info('[fusion-comfyui] toolbar observer timeout (30s)'); } }, 30000);
+    }
+    window.__fusionComfyTestids = function () {
+        var slugs = ['queue-prompt','queue-front','view-queue','view-history','settings','save','load','refresh','clear','load-default','reset-view','clipspace','save-api'];
+        var out = {};
+        slugs.forEach(function (s) { var el = document.querySelector('[data-testid=' + CSS.escape(s) + ']'); out[s] = !!el; });
+        out._ready = readyFired;
+        return out;
+    };
+})();</script></body></html>

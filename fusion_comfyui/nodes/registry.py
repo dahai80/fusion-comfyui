@@ -574,11 +574,18 @@ def build_node_info() -> dict:
     info = {}
     for name, cls in NODE_CLASS_MAPPINGS.items():
         input_types = cls.INPUT_TYPES()
+        return_names = getattr(cls, "RETURN_NAMES", [f"output_{i}" for i in range(len(cls.RETURN_TYPES))])
         info[name] = {
             "input": input_types,
             "output": list(cls.RETURN_TYPES),
             "output_is_list": [False] * len(cls.RETURN_TYPES),
-            "output_name": [f"output_{i}" for i in range(len(cls.RETURN_TYPES))],
+            "output_name": list(return_names),
+            "name": name,
+            "display_name": getattr(cls, "DISPLAY_NAME", name),
+            "description": getattr(cls, "DESCRIPTION", ""),
             "category": cls.CATEGORY,
+            "output_node": bool(getattr(cls, "OUTPUT_NODE", False)),
+            "python_module": "fusion_comfyui.nodes",
+            "deprecated": bool(getattr(cls, "DEPRECATED", False)),
         }
     return info

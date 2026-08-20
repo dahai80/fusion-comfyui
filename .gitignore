@@ -58,3 +58,11 @@ build/
 # Debug logs
 pytestdebug.log
 AppIcon.iconset/
+
+# Secrets / credentials (never commit)
+.env
+.env.*
+*.pem
+*.key
+secrets.*
+credentials.*

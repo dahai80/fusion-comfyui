@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint (ruff)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install ruff
+        run: pip install "ruff>=0.4"
+      - name: Ruff check
+        # Repo convention: lint scoped to the package + tests (vendored
+        # ComfyUI / sub-projects are excluded; see pyproject.toml ruff config).
+        run: ruff check fusion_comfyui tests
+
+  test:
+    name: Tests (pytest)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install package + dev deps
+        run: pip install -e ".[dev]"
+      - name: Run unit tests
+        env:
+          # E2E tests need Metal GPU + downloaded models; CI has neither, so
+          # they skip via their own pytest.skip / skipif guards. Force the
+          # e2e server port off so nothing tries to reach a live backend.
+          FUSION_COMFYUI_PORT: "0"
+        run: pytest tests/ -p no:randomly -q

@@ -7,6 +7,15 @@ from fusion_comfyui.server.static_files import (
 
 
 class TestStaticFiles:
+    @pytest.fixture(autouse=True)
+    def _restore_module_globals(self):
+        import fusion_comfyui.server.static_files as mod
+        saved_frontend = mod._frontend_dir
+        saved_output = mod._output_dir
+        yield
+        mod._frontend_dir = saved_frontend
+        mod._output_dir = saved_output
+
     def test_init_output_dir(self, tmp_path):
         import fusion_comfyui.server.static_files as mod
         mod._output_dir = tmp_path / "out"

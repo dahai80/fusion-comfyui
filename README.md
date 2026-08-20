@@ -38,6 +38,8 @@ The `ComfyUI/custom_nodes/ComfyUI-Fusion-MLX/` plugin overrides selected native 
 
 **Stable Cascade** (v0.2.6, issue #13): the 4 native `comfy_extras/nodes_stable_cascade.py` nodes (`StableCascade_EmptyLatentImage`, `StableCascade_StageC_VAEEncode`, `StableCascade_StageB_Conditioning`, `StableCascade_SuperResolutionControlnet`) are overridden with numpy latents (no `torch`). `CheckpointLoaderSimple`/`_fallback_model` route any `cascade`/`wuerstchen` checkpoint to the self-contained `models--stabilityai--stable-cascade-prior` pipeline (never a video model), and `FusionVAEWrapper` exposes `downscale_ratio` (4) + `encode()` so the native VAE-encode nodes no longer crash. The fusion-mlx `stable_cascade` variant runs end-to-end (prior→decoder→vqgan); txt2img Cascade workflows run fully, image-conditioned Cascade degrades to txt2img (tracked separately for an upstream engine change).
 
+**KSampler cfg/sampler forwarding + Wan routing** (v0.2.8, issue #315): the `KSampler` node now forwards its `cfg` to the engine (`guide_scale` + `cfg_scale`, so wan2 and the other backends both honor it) and `sampler_name` to the engine `scheduler` (via `normalize_sampler`, mapping ComfyUI spellings like `uni_pc`→`unipc`). `shift` is intentionally not forwarded (model-tuned). `_map_unet_name_to_model_name` gained early branches so `t2v`+`14b` checkpoints route to `Wan2.1-T2V-14B` (t2v weights, `in_dim=16`) and `fun`+`camera` checkpoints route to `Wan2.1-Fun-Camera-1.3B` (`add_control_adapter`), each before the generic 14b/i2v branches that previously loaded the wrong weights or dropped the camera control adapter. `to_numpy` uses `np.asarray` (NumPy 2.x-safe against MLX `__array__`).
+
 ## Project Structure
 
 ```

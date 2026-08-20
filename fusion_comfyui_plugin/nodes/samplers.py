@@ -5,7 +5,7 @@ import mlx.core as mx
 import numpy as np
 
 import core.async_utils
-from ._sampler_constants import SAMPLER_NAMES, SCHEDULER_NAMES
+from ._sampler_constants import SAMPLER_NAMES, SCHEDULER_NAMES, normalize_sampler
 
 logger = logging.getLogger("fusion_comfyui.nodes.samplers")
 
@@ -56,7 +56,8 @@ def _upscale_init_image(src_path: str, width: int, height: int) -> str:
 
 
 async def _generate_monolithic(model_wrapper, positive, negative, latent_image,
-                               steps, cfg, seed, width, height, num_frames, denoise=1.0):
+                               steps, cfg, seed, width, height, num_frames, denoise=1.0,
+                               sampler_name="euler"):
     engine = model_wrapper.get_engine()
     await engine.ensure_started()
 
@@ -64,6 +65,12 @@ async def _generate_monolithic(model_wrapper, positive, negative, latent_image,
     neg_prompt = negative.get("prompt", "") if negative else ""
     i2v_image = latent_image.get("_i2v_image_path")
     i2v_strength = latent_image.get("_i2v_image_strength", 1.0)
+
+    # Forward KSampler's sampler_name to the engine. wan2 treats the engine
+    # `scheduler` kwarg as the flow-solver selector (euler/dpm++/unipc); other
+    # video backends ignore it. normalize_sampler maps ComfyUI spellings
+    # (uni_pc->unipc, lcm->euler, dpmpp_2m_sde->dpmpp_2m, ...).
+    solver_name = normalize_sampler(sampler_name)
 
     if model_wrapper.model_type == "video":
         gen_kwargs = {
@@ -74,10 +81,19 @@ async def _generate_monolithic(model_wrapper, positive, negative, latent_image,
             "seed": seed,
             "n": 1,
             "num_inference_steps": steps,
-            "cfg_scale": cfg,
             "negative_prompt": neg_prompt or None,
             "output_format": "raw",
         }
+        # cfg is the workflow's classifier-free-guidance scale. wan2 consumes
+        # guide_scale (cfg_scale is ignored by the wan2 backend); ltx2/cosmos/
+        # hunyuan/svd consume cfg_scale (guide_scale ignored). Forward both so
+        # each backend honors the workflow intent. shift stays at the model
+        # config default (not forwarded) — shift is model-tuned and a wrong
+        # value degrades quality; the workflow's ComfyUI `scheduler` widget is
+        # a sigma-schedule name with no wan2 equivalent.
+        gen_kwargs["guide_scale"] = cfg
+        gen_kwargs["cfg_scale"] = cfg
+        gen_kwargs["scheduler"] = solver_name
         if i2v_image:
             gen_kwargs["image"] = i2v_image
             gen_kwargs["image_strength"] = i2v_strength
@@ -301,6 +317,7 @@ class KSampler:
             _generate_monolithic(
                 model, positive, negative, latent_image,
                 steps, cfg, seed, width, height, num_frames, denoise=denoise,
+                sampler_name=sampler_name,
             ),
             timeout=3600,
         )

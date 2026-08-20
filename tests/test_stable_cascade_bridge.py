@@ -1,8 +1,22 @@
 import logging
 
 import numpy as np
+import pytest
 
 logger = logging.getLogger("fusion.test.cascade_bridge")
+
+_CASCADE_DIR = "models--stabilityai--stable-cascade-prior"
+
+
+@pytest.fixture
+def cascade_model_installed(monkeypatch):
+    # _available_cascade_model() probes ~/.fusion-mlx/models for the cascade
+    # dir. On CI (no model downloaded) it returns None and the wuerstchen ->
+    # cascade routing falls through, so stub it to the expected dir to test
+    # the routing logic independent of the local filesystem.
+    import fusion_comfyui_plugin.core.wrappers as w
+    monkeypatch.setattr(w, "_available_cascade_model", lambda: _CASCADE_DIR)
+    return _CASCADE_DIR
 
 
 class TestCascadeRouting:
@@ -12,20 +26,21 @@ class TestCascadeRouting:
         assert "cascade" in resolved.lower(), resolved
         logger.info("fallback stage_b -> %s", resolved)
 
-    def test_fallback_model_routes_wuerstchen_to_prior(self):
+    def test_fallback_model_routes_wuerstchen_to_prior(self, cascade_model_installed):
         from fusion_comfyui_plugin.core.wrappers import _fallback_model
         resolved = _fallback_model("wuerstchen_v3_stage_c.safetensors")
         assert "cascade" in resolved.lower(), resolved
 
-    def test_fallback_cascade_never_returns_video_model(self):
+    def test_fallback_cascade_never_returns_video_model(self, cascade_model_installed):
         from fusion_comfyui_plugin.core.wrappers import _fallback_model
         for ckpt in ("stable_cascade_stage_b.safetensors",
-                     "stable_cascade_stage_c.safetensors"):
+                     "stable_cascade_stage_c.safetensors",
+                     "wuerstchen_v3_stage_c.safetensors"):
             resolved = _fallback_model(ckpt)
             low = resolved.lower()
             assert "wan" not in low and "flux" not in low and "ltx" not in low, resolved
 
-    def test_map_checkpoint_cascade(self):
+    def test_map_checkpoint_cascade(self, cascade_model_installed):
         from fusion_comfyui_plugin.core.wrappers import _map_checkpoint_to_model_name
         for ckpt in ("stable_cascade_stage_b.safetensors",
                      "stable_cascade_stage_c.safetensors",

@@ -272,6 +272,34 @@ class TestMapUnetName:
             result = _map_unet_name_to_model_name("ltx-2")
             assert result == "ltx-2.3-mlx-q8"
 
+    def test_wan21_t2v_14b_routes_to_t2v_weights(self):
+        from core.wrappers import _map_unet_name_to_model_name
+        with patch("core.wrappers._fallback_model", return_value="Wan2.1-T2V-14B") as fb:
+            result = _map_unet_name_to_model_name("wan2.1_t2v_14B_fp16.safetensors")
+            assert result == "Wan2.1-T2V-14B"
+            fb.assert_called_once_with("Wan2.1-T2V-14B")
+
+    def test_wan21_fun_camera_routes_to_dedicated_dir(self):
+        from core.wrappers import _map_unet_name_to_model_name
+        with patch("core.wrappers._fallback_model", return_value="Wan2.1-Fun-Camera-1.3B") as fb:
+            result = _map_unet_name_to_model_name("wan2.1_fun_camera_v1.1_1.3B_bf16.safetensors")
+            assert result == "Wan2.1-Fun-Camera-1.3B"
+            fb.assert_called_once_with("Wan2.1-Fun-Camera-1.3B")
+
+    def test_wan21_fun_camera_not_installed_falls_back(self):
+        from core.wrappers import _map_unet_name_to_model_name
+        with patch("core.wrappers._fallback_model", return_value="Wan2.2-5B") as fb:
+            result = _map_unet_name_to_model_name("wan2.1_fun_camera_v1.1_1.3B_bf16.safetensors")
+            assert result == "Wan2.2-5B"
+            fb.assert_called_once_with("Wan2.1-Fun-Camera-1.3B")
+
+    def test_wan21_i2v_14b_routes_to_i2v_weights(self):
+        from core.wrappers import _map_unet_name_to_model_name
+        with patch("core.wrappers._fallback_model", return_value="Wan2.1-14B") as fb:
+            result = _map_unet_name_to_model_name("wan2.1_i2v_480p_14B_fp16.safetensors")
+            assert result == "Wan2.1-14B"
+            assert fb.call_args_list[0].args[0] == "Wan2.1-14B"
+
     def test_ltx_2_3(self):
         from core.wrappers import _map_unet_name_to_model_name
         with patch("core.wrappers._fallback_model", return_value="ltx-2.3-mlx-q8"):

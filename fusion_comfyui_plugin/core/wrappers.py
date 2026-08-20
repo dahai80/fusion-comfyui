@@ -393,10 +393,41 @@ def _map_unet_name_to_model_name(unet_name: str) -> str:
             resolved = _fallback_model("Wan2.1-VACE-14B")
             logger.info("Map VACE ckpt %s -> Wan2.1-VACE-14B", unet_name)
             return resolved
-        # i2v/ti2v/fun/camera must be checked BEFORE 14b, otherwise
+        # Fun-Camera models have their own dedicated dir
+        # (add_control_adapter=True, in_dim=32). Must be checked BEFORE
+        # the generic i2v branch, otherwise "fun"/"camera" keyword routes
+        # them into the i2v -> Wan2.1-14B fallback and the camera control
+        # adapter (add_control_adapter) is silently lost.
+        if "fun" in name and "camera" in name:
+            resolved = _fallback_model("Wan2.1-Fun-Camera-1.3B")
+            if resolved == "Wan2.1-Fun-Camera-1.3B":
+                logger.info(
+                    "Mapping fun-camera ckpt %s -> Wan2.1-Fun-Camera-1.3B "
+                    "(add_control_adapter=True)",
+                    unet_name,
+                )
+                return resolved
+            logger.warning(
+                "fun-camera ckpt %s requested but Wan2.1-Fun-Camera-1.3B not "
+                "installed (got %s); camera control will be unavailable",
+                unet_name,
+                resolved,
+            )
+            return resolved
+        # t2v 14B must be checked BEFORE the generic 14b branch, otherwise
+        # "wan2.1_t2v_14B" matches "14b" and routes to Wan2.1-14B (i2v weights,
+        # in_dim=32) instead of the correct t2v weights (in_dim=16).
+        if "t2v" in name and "14b" in name:
+            resolved = _fallback_model("Wan2.1-T2V-14B")
+            logger.info(
+                "Mapping t2v 14B ckpt %s -> Wan2.1-T2V-14B (t2v weights)",
+                unet_name,
+            )
+            return resolved
+        # i2v/ti2v must be checked BEFORE 14b, otherwise
         # "wan2.1_i2v_480p_14B" matches "14b" first and routes to
         # Wan2.1-14B (t2v-only) instead of the correct i2v fallback.
-        if any(k in name for k in ("fun", "camera", "i2v", "ti2v")):
+        if any(k in name for k in ("i2v", "ti2v")):
             # Prefer dedicated Wan2.1-14B I2V model if dit/ has weights
             resolved_i2v = _fallback_model("Wan2.1-14B")
             if resolved_i2v == "Wan2.1-14B":

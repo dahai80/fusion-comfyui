@@ -36,7 +36,7 @@ def to_numpy(data) -> np.ndarray:
 
     if isinstance(data, mx.array):
         mx.eval(data)
-        return np.array(data, copy=False)
+        return np.asarray(data)
 
     if hasattr(data, "cpu") and hasattr(data, "numpy"):
         return data.cpu().numpy()

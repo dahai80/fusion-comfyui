@@ -5,12 +5,12 @@ from fusion_comfyui.nodes.base import BaseNode
 from fusion_comfyui.core.timer import NodeTimer
 from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
 
-logger = logging.getLogger("fusion_comfyui.nodes.xiyouji.lipsync")
+logger = logging.getLogger("fusion_comfyui.nodes.drama.lipsync")
 
 
 class FusionLipSync(BaseNode):
     RETURN_TYPES = ("VIDEO_PATH",)
-    CATEGORY = "fusion-mlx/xiyouji"
+    CATEGORY = "fusion-mlx/drama"
 
     @classmethod
     def INPUT_TYPES(cls):

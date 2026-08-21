@@ -6,11 +6,11 @@ import sys
 from fusion_comfyui.core.timer import NodeTimer
 from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper, unload_all_fusion_engines
 from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
-from fusion_comfyui.nodes.xiyouji.vlm import XiyoujiChapterParser
-from fusion_comfyui.nodes.xiyouji.assemble import SceneVideoAssembler, ChapterVideoConcat
+from fusion_comfyui.nodes.drama.vlm import DramaChapterParser
+from fusion_comfyui.nodes.drama.assemble import SceneVideoAssembler, ChapterVideoConcat
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
-logger = logging.getLogger("xiyouji_pipeline")
+logger = logging.getLogger("drama_pipeline")
 
 CHARACTER_PORTRAITS = {
     "sunwukong": os.environ.get("PORTRAIT_SUNWUKONG", ""),
@@ -20,17 +20,17 @@ CHARACTER_PORTRAITS = {
     "bailongma": os.environ.get("PORTRAIT_BAILONGMA", ""),
 }
 
-DEFAULT_MODEL = os.environ.get("XIYOUJI_MODEL", "FLUX.2-klein-base-4B")
-DEFAULT_VLM = os.environ.get("XIYOUJI_VLM", "mlx-community/Qwen2.5-VL-7B-Instruct-4bit")
-DEFAULT_TTS = os.environ.get("XIYOUJI_TTS", "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit")
-DEFAULT_LIPSYNC_MODEL = os.environ.get("XIYOUJI_LIPSYNC_DIR", "")
-DEFAULT_STEPS = int(os.environ.get("XIYOUJI_STEPS", "4"))
-DEFAULT_WIDTH = int(os.environ.get("XIYOUJI_WIDTH", "512"))
-DEFAULT_HEIGHT = int(os.environ.get("XIYOUJI_HEIGHT", "512"))
+DEFAULT_MODEL = os.environ.get("DRAMA_MODEL", "FLUX.2-klein-base-4B")
+DEFAULT_VLM = os.environ.get("DRAMA_VLM", "mlx-community/Qwen2.5-VL-7B-Instruct-4bit")
+DEFAULT_TTS = os.environ.get("DRAMA_TTS", "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit")
+DEFAULT_LIPSYNC_MODEL = os.environ.get("DRAMA_LIPSYNC_DIR", "")
+DEFAULT_STEPS = int(os.environ.get("DRAMA_STEPS", "4"))
+DEFAULT_WIDTH = int(os.environ.get("DRAMA_WIDTH", "512"))
+DEFAULT_HEIGHT = int(os.environ.get("DRAMA_HEIGHT", "512"))
 
 
 async def run_chapter(chapter_text: str, chapter_title: str = "chapter"):
-    logger.info("=== Xiyouji Pipeline: %s ===", chapter_title)
+    logger.info("=== Drama Pipeline: %s ===", chapter_title)
 
     output_dir = os.environ.get("FUSION_OUTPUT_DIR", "output")
     os.makedirs(output_dir, exist_ok=True)
@@ -41,7 +41,7 @@ async def run_chapter(chapter_text: str, chapter_title: str = "chapter"):
 
     # Phase 1: Parse chapter into scenes (programmatic, no VLM to save memory)
     logger.info("[Phase 1] Parsing chapter into scenes (programmatic)...")
-    parser = XiyoujiChapterParser()
+    parser = DramaChapterParser()
     scenes = parser.split_only(chapter_text)
     logger.info("[Phase 1] Got %d scenes", len(scenes))
 
@@ -159,13 +159,13 @@ async def run_chapter(chapter_text: str, chapter_title: str = "chapter"):
 
 def main():
     chapter_num = int(sys.argv[1]) if len(sys.argv) > 1 else 1
-    xiyouji_path = os.environ.get("XIYOUJI_TEXT", "西游记.txt")
+    drama_path = os.environ.get("DRAMA_TEXT", "script.txt")
 
-    if not os.path.exists(xiyouji_path):
-        logger.error("西游记.txt not found at %s", xiyouji_path)
+    if not os.path.exists(drama_path):
+        logger.error("script.txt not found at %s", drama_path)
         sys.exit(1)
 
-    with open(xiyouji_path, "r", encoding="utf-8") as f:
+    with open(drama_path, "r", encoding="utf-8") as f:
         full_text = f.read()
 
     chapters = full_text.split("第")[1:]

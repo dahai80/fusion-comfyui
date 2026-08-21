@@ -5,7 +5,7 @@ import subprocess
 from fusion_comfyui.nodes.base import BaseNode
 from fusion_comfyui.core.timer import NodeTimer
 
-logger = logging.getLogger("fusion_comfyui.nodes.xiyouji.assemble")
+logger = logging.getLogger("fusion_comfyui.nodes.drama.assemble")
 
 _IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".bmp")
 
@@ -59,7 +59,7 @@ def _burn_subtitles(image_path: str, text: str, font_size: int = 28, y_offset: i
 
 class SceneVideoAssembler(BaseNode):
     RETURN_TYPES = ("VIDEO_PATH",)
-    CATEGORY = "fusion-mlx/xiyouji"
+    CATEGORY = "fusion-mlx/drama"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -138,7 +138,7 @@ class SceneVideoAssembler(BaseNode):
 
 class ChapterVideoConcat(BaseNode):
     RETURN_TYPES = ("VIDEO_PATH",)
-    CATEGORY = "fusion-mlx/xiyouji"
+    CATEGORY = "fusion-mlx/drama"
 
     @classmethod
     def INPUT_TYPES(cls):

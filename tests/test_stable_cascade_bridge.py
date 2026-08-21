@@ -20,7 +20,7 @@ def cascade_model_installed(monkeypatch):
 
 
 class TestCascadeRouting:
-    def test_fallback_model_routes_cascade_to_prior(self):
+    def test_fallback_model_routes_cascade_to_prior(self, cascade_model_installed):
         from fusion_comfyui_plugin.core.wrappers import _fallback_model
         resolved = _fallback_model("stable_cascade_stage_b.safetensors")
         assert "cascade" in resolved.lower(), resolved

@@ -530,9 +530,9 @@ class FusionDenoiseStats(BaseNode):
         return (json.dumps(stats, indent=2, default=str),)
 
 
-from fusion_comfyui.nodes.xiyouji.registry import (
-    NODE_CLASS_MAPPINGS as _XIYOUJI_CLASS,
-    NODE_DISPLAY_NAME_MAPPINGS as _XIYOUJI_DISPLAY,
+from fusion_comfyui.nodes.drama.registry import (
+    NODE_CLASS_MAPPINGS as _DRAMA_CLASS,
+    NODE_DISPLAY_NAME_MAPPINGS as _DRAMA_DISPLAY,
 )
 
 NODE_CLASS_MAPPINGS = {
@@ -550,7 +550,7 @@ NODE_CLASS_MAPPINGS = {
     "FusionLatentFromImage": FusionLatentFromImage,
     "FusionDenoiseStats": FusionDenoiseStats,
 }
-NODE_CLASS_MAPPINGS.update(_XIYOUJI_CLASS)
+NODE_CLASS_MAPPINGS.update(_DRAMA_CLASS)
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "FusionModelLoader": "⚡ Fusion-MLX Model Loader",
@@ -567,7 +567,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "FusionLatentFromImage": "⚡ Fusion-MLX Image→Latent",
     "FusionDenoiseStats": "⚡ Fusion-MLX Denoise Stats",
 }
-NODE_DISPLAY_NAME_MAPPINGS.update(_XIYOUJI_DISPLAY)
+NODE_DISPLAY_NAME_MAPPINGS.update(_DRAMA_DISPLAY)
 
 
 def build_node_info() -> dict:

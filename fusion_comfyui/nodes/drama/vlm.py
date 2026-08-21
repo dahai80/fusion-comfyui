@@ -5,25 +5,25 @@ from fusion_comfyui.nodes.base import BaseNode
 from fusion_comfyui.core.timer import NodeTimer
 from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
 
-logger = logging.getLogger("fusion_comfyui.nodes.xiyouji.vlm")
+logger = logging.getLogger("fusion_comfyui.nodes.drama.vlm")
 
-SPLIT_PROMPT = """将以下西游记回目拆分为3-5个场景。输出纯JSON数组，不要markdown包裹。
+SPLIT_PROMPT = """将以下小说/剧本章节拆分为3-5个场景。输出纯JSON数组，不要markdown包裹。
 
 每个场景字段:
 - scene_id: 整数
 - description_en: 英文画面描述(1-2句话，简洁，用于AI生图)
 - description_cn: 中文场景描述(1句话，用于字幕)
-- characters: 角色列表(sunwukong/tangseng/zhubajie/shaseng/bailongma)
+- characters: 角色列表(英文标识符，如主角A/protagonist等，留空则自动推断)
 - dialogue: 对话列表[{{speaker,text}}]
 - scene_type: battle/dialogue/travel/transformation
 - duration_seconds: 3-8
 
 要求: description_en简洁，不超过50词。JSON必须完整闭合。
 
-回目内容:
+章节内容:
 {chapter_text}"""
 
-DESCRIPTION_PROMPT = """为以下西游记场景写一句英文画面描述(用于AI图像生成)。
+DESCRIPTION_PROMPT = """为以下场景写一句英文画面描述(用于AI图像生成)。
 要求: 简洁，不超过50词，描述画面内容，不要对话。
 
 场景: {scene_cn}
@@ -31,9 +31,9 @@ DESCRIPTION_PROMPT = """为以下西游记场景写一句英文画面描述(用�
 输出格式: 直接输出英文描述，不要其他内容。"""
 
 
-class XiyoujiChapterParser(BaseNode):
+class DramaChapterParser(BaseNode):
     RETURN_TYPES = ("SCENE_SCRIPTS",)
-    CATEGORY = "fusion-mlx/xiyouji"
+    CATEGORY = "fusion-mlx/drama"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -46,17 +46,17 @@ class XiyoujiChapterParser(BaseNode):
         }
 
     async def execute(self, chapter_text, vlm_model="mlx-community/Qwen2.5-VL-7B-Instruct-4bit", max_tokens=4096):
-        async with NodeTimer.timed("XiyoujiChapterParser", "full", text_len=len(chapter_text)):
+        async with NodeTimer.timed("DramaChapterParser", "full", text_len=len(chapter_text)):
             scenes = self._split_text_to_scenes(chapter_text)
 
             from fusion_mlx.engines.vlm import VLMBatchedEngine
 
-            async with NodeTimer.timed("XiyoujiChapterParser", "load_vlm"):
+            async with NodeTimer.timed("DramaChapterParser", "load_vlm"):
                 engine = VLMBatchedEngine(vlm_model)
                 await engine.start()
-                logger.info("XiyoujiChapterParser: VLM started %s", vlm_model)
+                logger.info("DramaChapterParser: VLM started %s", vlm_model)
 
-            async with NodeTimer.timed("XiyoujiChapterParser", "vlm_generate"):
+            async with NodeTimer.timed("DramaChapterParser", "vlm_generate"):
                 for scene in scenes:
                     if not scene.get("description_en"):
                         desc_cn = scene.get("description_cn", "")
@@ -77,11 +77,11 @@ class XiyoujiChapterParser(BaseNode):
                             except Exception as e:
                                 logger.warning("VLM en-desc failed: %s", e)
 
-            async with NodeTimer.timed("XiyoujiChapterParser", "unload_vlm"):
+            async with NodeTimer.timed("DramaChapterParser", "unload_vlm"):
                 await engine.stop()
                 FusionMemoryGuardian.purge_memory()
 
-            logger.info("XiyoujiChapterParser: parsed %d scenes", len(scenes))
+            logger.info("DramaChapterParser: parsed %d scenes", len(scenes))
             return (scenes,)
 
     SCENE_TYPE_EN = {

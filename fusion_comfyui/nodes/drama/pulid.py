@@ -8,25 +8,25 @@ from fusion_comfyui.nodes.base import BaseNode
 from fusion_comfyui.core.timer import NodeTimer
 from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
 
-logger = logging.getLogger("fusion_comfyui.nodes.xiyouji.pulid")
+logger = logging.getLogger("fusion_comfyui.nodes.drama.pulid")
 
 
 class PuLIDIdentityExtract(BaseNode):
     RETURN_TYPES = ("ID_EMBEDDING",)
-    CATEGORY = "fusion-mlx/xiyouji"
+    CATEGORY = "fusion-mlx/drama"
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
                 "image": ("IMAGE",),
-                "character_name": ("STRING", {"default": "sunwukong"}),
+                "character_name": ("STRING", {"default": "character_1"}),
                 "model_dir": ("STRING", {"default": ""}),
                 "cache_dir": ("STRING", {"default": "identity_cache"}),
             }
         }
 
-    async def execute(self, image, character_name="sunwukong", model_dir="", cache_dir="identity_cache"):
+    async def execute(self, image, character_name="character_1", model_dir="", cache_dir="identity_cache"):
         async with NodeTimer.timed("PuLIDIdentityExtract", "full"):
             cache_path = os.path.join(cache_dir, f"{character_name}.safetensors")
             if os.path.exists(cache_path):
@@ -69,7 +69,7 @@ class PuLIDIdentityExtract(BaseNode):
 
 class PuLIDConditioningApply(BaseNode):
     RETURN_TYPES = ("CONDITIONING",)
-    CATEGORY = "fusion-mlx/xiyouji"
+    CATEGORY = "fusion-mlx/drama"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -115,7 +115,7 @@ class PuLIDConditioningApply(BaseNode):
 
 class PuLIDClearID(BaseNode):
     RETURN_TYPES = ("MODEL",)
-    CATEGORY = "fusion-mlx/xiyouji"
+    CATEGORY = "fusion-mlx/drama"
 
     @classmethod
     def INPUT_TYPES(cls):

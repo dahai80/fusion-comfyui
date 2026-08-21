@@ -225,6 +225,9 @@ def _fallback_model(requested: str) -> str:
             return cascade_dir
         logger.warning("Stable Cascade checkpoint %s requested but no cascade model installed", requested)
     available = _available_video_models()
+    if ("minimax" in name or "h3" in name) and "minimax-h3" in available:
+        logger.info("Falling back %s -> minimax-h3 (H3 video)", requested)
+        return "minimax-h3"
     if "wan" in name and "Wan2.2-5B" in available:
         logger.info("Falling back %s -> Wan2.2-5B (requested not available)", requested)
         return "Wan2.2-5B"

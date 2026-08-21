@@ -22,6 +22,10 @@ _MODEL_TYPES = {
     "cosmos": "video",
     "hunyuan": "video",
     "svd": "video",
+    "minimax": "video",
+    "h3": "video",
+    "fl2va": "video",
+    "ref2va": "video",
 }
 
 _LATENT_CHANNELS = {
@@ -34,6 +38,10 @@ _LATENT_CHANNELS = {
     "cosmos": 16,
     "hunyuan": 16,
     "svd": 4,
+    "minimax": 24,
+    "h3": 24,
+    "fl2va": 24,
+    "ref2va": 24,
 }
 
 
@@ -327,6 +335,42 @@ class FusionEngineWrapper:
             )
             logger.info("generate_image: %dx%d steps=%d seed=%d", width, height, steps, seed)
             return result_bytes[0]
+
+    async def generate_video(
+        self,
+        prompt: str,
+        num_frames: int = 49,
+        width: int = 768,
+        height: int = 448,
+        seed: int = 0,
+        output_path: str = "",
+        fps: int = 24,
+        **kwargs,
+    ) -> str:
+        async with NodeTimer.timed(self.model_name, "generate_video", frames=num_frames, seed=seed):
+            await self.ensure_started()
+            logger.info("generate_video: prompt=%dchars frames=%d %dx%d seed=%d", len(prompt), num_frames, width, height, seed)
+            if self.model_type != "video":
+                logger.warning("generate_video called on non-video model %s", self.model_name)
+            gen_kwargs = dict(
+                prompt=prompt,
+                num_frames=num_frames,
+                width=width,
+                height=height,
+                seed=seed,
+                n=1,
+                fps=fps,
+                on_step=self._on_step,
+            )
+            gen_kwargs.update(kwargs)
+            result_bytes = await self._engine.generate(**gen_kwargs)
+            if not output_path:
+                import tempfile
+                output_path = tempfile.mktemp(suffix=".mp4")
+            with open(output_path, "wb") as f:
+                f.write(result_bytes[0])
+            logger.info("generate_video: wrote %s (%d bytes)", output_path, len(result_bytes[0]))
+            return output_path
 
     async def _fallback_generate(self, latent, positive, negative, steps, cfg, seed, **kwargs):
         logger.info("fallback: using monolithic generate() for %s", self.model_name)

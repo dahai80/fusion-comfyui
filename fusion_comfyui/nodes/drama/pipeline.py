@@ -21,12 +21,17 @@ CHARACTER_PORTRAITS = {
 }
 
 DEFAULT_MODEL = os.environ.get("DRAMA_MODEL", "FLUX.2-klein-base-4B")
+DEFAULT_VIDEO_MODEL = os.environ.get("DRAMA_VIDEO_MODEL", "")
+DEFAULT_QUANTIZE = os.environ.get("DRAMA_QUANTIZE", "dit8_te4")
 DEFAULT_VLM = os.environ.get("DRAMA_VLM", "mlx-community/Qwen2.5-VL-7B-Instruct-4bit")
 DEFAULT_TTS = os.environ.get("DRAMA_TTS", "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit")
 DEFAULT_LIPSYNC_MODEL = os.environ.get("DRAMA_LIPSYNC_DIR", "")
+DRAMA_ENABLE_TTS = os.environ.get("DRAMA_TTS_ENABLED", "0") == "1"
 DEFAULT_STEPS = int(os.environ.get("DRAMA_STEPS", "4"))
 DEFAULT_WIDTH = int(os.environ.get("DRAMA_WIDTH", "512"))
 DEFAULT_HEIGHT = int(os.environ.get("DRAMA_HEIGHT", "512"))
+DEFAULT_VIDEO_FRAMES = int(os.environ.get("DRAMA_VIDEO_FRAMES", "49"))
+DEFAULT_VIDEO_FPS = int(os.environ.get("DRAMA_VIDEO_FPS", "24"))
 
 
 async def run_chapter(chapter_text: str, chapter_title: str = "chapter"):
@@ -52,55 +57,99 @@ async def run_chapter(chapter_text: str, chapter_title: str = "chapter"):
     if skip_pulid:
         logger.info("[Phase 2] PULID_MODEL_DIR not set, skipping PuLID identity extraction")
 
-    # Phase 3: Generate scene images via monolithic generate()
-    logger.info("[Phase 3] Generating scene images...")
+    # Phase 3: Generate scene media (video if DRAMA_VIDEO_MODEL set, else image)
+    # Read env at call time (not import) so tests + runtime can toggle per-run.
+    video_model = os.environ.get("DRAMA_VIDEO_MODEL", "")
+    use_video = bool(video_model)
+    logger.info("[Phase 3] Generating scene %s...", "video" if use_video else "images")
+
     scene_videos = []
     scene_audios = []
 
-    model = FusionEngineWrapper(DEFAULT_MODEL, offload_strategy="sequential", quant_bit="none")
+    model_name = video_model if use_video else os.environ.get("DRAMA_MODEL", DEFAULT_MODEL)
+    model = FusionEngineWrapper(model_name, offload_strategy="sequential", quant_bit="none")
+
+    # Optional TTS engine (loaded once, reused per scene)
+    tts_engine = None
+    if os.environ.get("DRAMA_TTS_ENABLED", "0") == "1":
+        try:
+            tts_engine = FusionEngineWrapper(DEFAULT_TTS, offload_strategy="sequential")
+            await tts_engine.load_tts(DEFAULT_TTS)
+            logger.info("[Phase 3] TTS engine loaded: %s", DEFAULT_TTS)
+        except Exception as e:
+            logger.warning("[Phase 3] TTS load failed, audio disabled: %s", e)
+            tts_engine = None
 
     for idx, scene in enumerate(scenes):
         scene_id = int(scene.get("scene_id", idx + 1))
         desc_en = scene.get("description_en", "")
         desc_cn = scene.get("description_cn", "")
-        scene.get("characters", [])
-        scene.get("dialogue", [])
-        float(scene.get("duration_seconds", 5))
+        dialogue = scene.get("dialogue", [])
+        seed = int(scene_id) * 1000
 
         logger.info("[Phase 3] Scene %d: %s", scene_id, desc_cn[:60])
 
-        frame_path = os.path.join(output_dir, f"{chapter_title}_scene_{scene_id}.png")
-
         try:
-            png_bytes = await model.generate_image(
-                prompt=desc_en,
-                negative_prompt="low quality, blurry, deformed, watermark, text",
-                width=DEFAULT_WIDTH,
-                height=DEFAULT_HEIGHT,
-                steps=DEFAULT_STEPS,
-                cfg=3.5,
-                seed=int(scene_id) * 1000,
-            )
-            with open(frame_path, "wb") as f:
-                f.write(png_bytes)
-            logger.info("[Phase 3] Scene %d image saved: %s (%d bytes)", scene_id, frame_path, len(png_bytes))
+            if use_video:
+                video_path = os.path.join(output_dir, f"{chapter_title}_scene_{scene_id}.mp4")
+                video_path = await model.generate_video(
+                    prompt=desc_en,
+                    num_frames=DEFAULT_VIDEO_FRAMES,
+                    width=DEFAULT_WIDTH,
+                    height=DEFAULT_HEIGHT,
+                    seed=seed,
+                    output_path=video_path,
+                    fps=DEFAULT_VIDEO_FPS,
+                    quantize=DEFAULT_QUANTIZE,
+                )
+                scene_videos.append(video_path)
+                logger.info("[Phase 3] Scene %d video saved: %s", scene_id, video_path)
+            else:
+                frame_path = os.path.join(output_dir, f"{chapter_title}_scene_{scene_id}.png")
+                png_bytes = await model.generate_image(
+                    prompt=desc_en,
+                    negative_prompt="low quality, blurry, deformed, watermark, text",
+                    width=DEFAULT_WIDTH,
+                    height=DEFAULT_HEIGHT,
+                    steps=DEFAULT_STEPS,
+                    cfg=3.5,
+                    seed=seed,
+                )
+                with open(frame_path, "wb") as f:
+                    f.write(png_bytes)
+                scene_videos.append(frame_path)
+                logger.info("[Phase 3] Scene %d image saved: %s (%d bytes)", scene_id, frame_path, len(png_bytes))
         except Exception as e:
-            logger.warning("[Phase 3] Image gen failed for scene %d: %s — using placeholder", scene_id, e)
-            from PIL import Image as PILImage
-            pil_img = PILImage.new("RGB", (DEFAULT_WIDTH, DEFAULT_HEIGHT), (128, 128, 128))
-            pil_img.save(frame_path)
+            logger.warning("[Phase 3] Gen failed for scene %d: %s — placeholder", scene_id, e)
+            if use_video:
+                from PIL import Image as PILImage
+                placeholder = os.path.join(output_dir, f"{chapter_title}_scene_{scene_id}.png")
+                PILImage.new("RGB", (DEFAULT_WIDTH, DEFAULT_HEIGHT), (128, 128, 128)).save(placeholder)
+                scene_videos.append(placeholder)
             FusionMemoryGuardian.purge_memory()
 
-        # Image → video: for image-only models, the image IS the frame
-        scene_videos.append(frame_path)
+        # TTS for dialogue lines (concatenate all lines into one audio)
+        audio_path = ""
+        if tts_engine and dialogue:
+            try:
+                full_line = " ".join(str(d) for d in dialogue) if isinstance(dialogue, list) else str(dialogue)
+                wav_bytes = await tts_engine.tts_synthesize(text=full_line, speed=1.0)
+                audio_path = os.path.join(output_dir, f"{chapter_title}_scene_{scene_id}.wav")
+                with open(audio_path, "wb") as f:
+                    f.write(wav_bytes)
+                logger.info("[Phase 3] Scene %d TTS saved: %s", scene_id, audio_path)
+            except Exception as e:
+                logger.warning("[Phase 3] TTS failed for scene %d: %s", scene_id, e)
+                audio_path = ""
+        scene_audios.append(audio_path)
+
         FusionMemoryGuardian.purge_memory()
 
-        # TTS for dialogue — skip for now (VLM+FLUX+TTS = OOM)
-        scene_audios.append("")
-
-    # Unload FLUX model after all scene images generated
-    logger.info("[Phase 3.5] Unloading FLUX model to free memory...")
+    # Unload generation model + TTS after all scenes
+    logger.info("[Phase 3.5] Unloading model(s) to free memory...")
     await model.stop()
+    if tts_engine:
+        await tts_engine.stop()
     FusionMemoryGuardian.purge_memory()
 
     # Phase 4: Assemble scenes

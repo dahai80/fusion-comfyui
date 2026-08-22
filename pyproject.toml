@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fusion-comfyui"
-version = "0.2.10"
+version = "0.2.11"
 description = "Pure MLX ComfyUI server on Apple Silicon — no PyTorch runtime"
 readme = "README.md"
 license = "Apache-2.0"
@@ -25,7 +25,7 @@ classifiers = [
 ]
 dependencies = [
     "mlx>=0.22.0",
-    "fusion-mlx>=0.8.33",
+    "fusion-mlx>=0.8.34",
     "fastapi>=0.110.0",
     "uvicorn[standard]>=0.29.0",
     "websockets>=12.0",

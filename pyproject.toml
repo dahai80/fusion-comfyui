@@ -25,7 +25,7 @@ classifiers = [
 ]
 dependencies = [
     "mlx>=0.22.0",
-    "fusion-mlx>=0.8.29",
+    "fusion-mlx>=0.8.33",
     "fastapi>=0.110.0",
     "uvicorn[standard]>=0.29.0",
     "websockets>=12.0",

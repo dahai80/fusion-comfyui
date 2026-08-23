@@ -32,6 +32,10 @@ DEFAULT_WIDTH = int(os.environ.get("DRAMA_WIDTH", "512"))
 DEFAULT_HEIGHT = int(os.environ.get("DRAMA_HEIGHT", "512"))
 DEFAULT_VIDEO_FRAMES = int(os.environ.get("DRAMA_VIDEO_FRAMES", "49"))
 DEFAULT_VIDEO_FPS = int(os.environ.get("DRAMA_VIDEO_FPS", "24"))
+# F1: H3 原生音频联合生成（t2va A/V）。默认关——H3 33B 联合生成显存峰值更高，
+# 且 F2 TTS 台词外挂仍是主要人声来源。开启后 video mp4 自带音频轨（环境音/配乐），
+# SceneVideoAssembler 用 amix 把原生音频轨 + F2 TTS wav 混合（人声叠环境音）。
+DRAMA_NATIVE_AUDIO = os.environ.get("DRAMA_NATIVE_AUDIO", "0") == "1"
 
 
 async def run_chapter(chapter_text: str, chapter_title: str = "chapter"):
@@ -65,6 +69,9 @@ async def run_chapter(chapter_text: str, chapter_title: str = "chapter"):
 
     scene_videos = []
     scene_audios = []
+    # native_audio_per_scene: 记录每场景 video 是否已含 H3 原生音频轨，
+    # 供 Phase 4 assembler 决定 amix（原生轨+F2 TTS）还是单轨替换。
+    native_audio_per_scene = []
 
     model_name = video_model if use_video else os.environ.get("DRAMA_MODEL", DEFAULT_MODEL)
     model = FusionEngineWrapper(model_name, offload_strategy="sequential", quant_bit="none")
@@ -92,6 +99,8 @@ async def run_chapter(chapter_text: str, chapter_title: str = "chapter"):
         try:
             if use_video:
                 video_path = os.path.join(output_dir, f"{chapter_title}_scene_{scene_id}.mp4")
+                # call-time 读 DRAMA_NATIVE_AUDIO（与 use_video 同理，测试可 per-run toggle）。
+                native_audio = os.environ.get("DRAMA_NATIVE_AUDIO", "0") == "1"
                 video_path = await model.generate_video(
                     prompt=desc_en,
                     num_frames=DEFAULT_VIDEO_FRAMES,
@@ -101,9 +110,14 @@ async def run_chapter(chapter_text: str, chapter_title: str = "chapter"):
                     output_path=video_path,
                     fps=DEFAULT_VIDEO_FPS,
                     quantize=DEFAULT_QUANTIZE,
+                    audio=native_audio,
                 )
                 scene_videos.append(video_path)
-                logger.info("[Phase 3] Scene %d video saved: %s", scene_id, video_path)
+                native_audio_per_scene.append(native_audio)
+                logger.info(
+                    "[Phase 3] Scene %d video saved: %s (native_audio=%s)",
+                    scene_id, video_path, native_audio,
+                )
             else:
                 frame_path = os.path.join(output_dir, f"{chapter_title}_scene_{scene_id}.png")
                 png_bytes = await model.generate_image(
@@ -118,6 +132,7 @@ async def run_chapter(chapter_text: str, chapter_title: str = "chapter"):
                 with open(frame_path, "wb") as f:
                     f.write(png_bytes)
                 scene_videos.append(frame_path)
+                native_audio_per_scene.append(False)
                 logger.info("[Phase 3] Scene %d image saved: %s (%d bytes)", scene_id, frame_path, len(png_bytes))
         except Exception as e:
             logger.warning("[Phase 3] Gen failed for scene %d: %s — placeholder", scene_id, e)
@@ -126,6 +141,7 @@ async def run_chapter(chapter_text: str, chapter_title: str = "chapter"):
                 placeholder = os.path.join(output_dir, f"{chapter_title}_scene_{scene_id}.png")
                 PILImage.new("RGB", (DEFAULT_WIDTH, DEFAULT_HEIGHT), (128, 128, 128)).save(placeholder)
                 scene_videos.append(placeholder)
+                native_audio_per_scene.append(False)
             FusionMemoryGuardian.purge_memory()
 
         # TTS for dialogue lines (concatenate all lines into one audio)
@@ -160,6 +176,7 @@ async def run_chapter(chapter_text: str, chapter_title: str = "chapter"):
             logger.warning("[Phase 4] Missing scene: %s", vid)
             continue
         audio = scene_audios[idx] if idx < len(scene_audios) else ""
+        native_audio = native_audio_per_scene[idx] if idx < len(native_audio_per_scene) else False
         subtitle = scenes[idx].get("description_cn", "") if idx < len(scenes) else ""
         scene_dur = float(scenes[idx].get("duration_seconds", 5)) if idx < len(scenes) else 5.0
         try:
@@ -171,6 +188,7 @@ async def run_chapter(chapter_text: str, chapter_title: str = "chapter"):
                 subtitle_font_size=28,
                 subtitle_y_offset=40,
                 duration=scene_dur,
+                native_audio=native_audio,
             )
             assembled_scenes.append(result[0])
         except Exception as e:

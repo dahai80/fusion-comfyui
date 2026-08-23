@@ -136,6 +136,10 @@ class TestInterrupt:
         resp = await interrupt()
         data = json.loads(resp.body)
         assert data["status"] == "ok"
+        # interrupt() 置 _interrupt_flag=True 但本测试不消费；
+        # 残留 flag 会污染后续 DAG executor（check_interrupt 读到残留 → interrupted）。
+        # 消费掉，保持全局状态干净。
+        assert check_interrupt() is True
 
     def test_check_interrupt_consumes_flag(self):
         request_interrupt()

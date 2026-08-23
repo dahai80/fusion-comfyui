@@ -65,6 +65,11 @@ class TestApiRouteAliases:
     def test_api_interrupt(self, client):
         r = client.post("/api/interrupt")
         assert r.status_code == 200
+        # /api/interrupt 置 _interrupt_flag=True；消费残留 flag 防污染后续
+        # DAG executor（check_interrupt 读到残留 → status=interrupted）。
+        from fusion_comfyui.server.protocol import check_interrupt
+
+        assert check_interrupt() is True
 
     def test_api_embeddings(self, client):
         assert client.get("/api/embeddings").status_code == 200

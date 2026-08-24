@@ -71,12 +71,14 @@ class SceneVideoAssembler(BaseNode):
                 "subtitle_font_size": ("INT", {"default": 28, "min": 12, "max": 72}),
                 "subtitle_y_offset": ("INT", {"default": 40, "min": 0, "max": 200}),
                 "duration": ("FLOAT", {"default": 5.0, "min": 1.0, "max": 60.0}),
+                "native_audio": ("BOOLEAN", {"default": False}),
             }
         }
 
     async def execute(
         self, video_path, audio_path="", subtitle_text="",
         subtitle_font_size=28, subtitle_y_offset=40, duration=5.0,
+        native_audio=False,
     ):
         async with NodeTimer.timed("SceneVideoAssembler", "full"):
             output_dir = os.environ.get("FUSION_OUTPUT_DIR", "output")
@@ -118,14 +120,30 @@ class SceneVideoAssembler(BaseNode):
                 logger.info("SceneVideoAssembler: image->video %s -> %s", video_path, output_path)
                 return (output_path,)
 
-            # For video files: add audio if present
-            cmd = ["ffmpeg", "-y", "-i", video_path]
-            if audio_path and os.path.exists(audio_path):
-                cmd += ["-i", audio_path]
-            cmd += [
-                "-c:v", "libx264", "-preset", "medium",
-                "-c:a", "aac", "-shortest", output_path,
-            ]
+            # For video files: mux audio.
+            # native_audio=True 表示 video_path 已含 H3 原生音频轨（环境音/配乐）。
+            #   + TTS wav → amix 混合（人声 weight 1.0 叠环境音 0.5，duration=longest 让环境音铺满）。
+            #   无 TTS    → 保留原生轨（单输入，-c:a aac 编码原生轨，-shortest no-op）。
+            # native_audio=False（旧路径）→ TTS 替换原生轨（video 无原生轨时即加音轨）。
+            has_tts = bool(audio_path) and os.path.exists(audio_path)
+            if native_audio and has_tts:
+                cmd = [
+                    "ffmpeg", "-y", "-i", video_path, "-i", audio_path,
+                    "-filter_complex",
+                    "[0:a][1:a]amix=inputs=2:duration=longest:dropout_transition=0:weights=1 0.5[a]",
+                    "-map", "0:v", "-map", "[a]",
+                    "-c:v", "libx264", "-preset", "medium",
+                    "-c:a", "aac",
+                    output_path,
+                ]
+            else:
+                cmd = ["ffmpeg", "-y", "-i", video_path]
+                if has_tts:
+                    cmd += ["-i", audio_path]
+                cmd += [
+                    "-c:v", "libx264", "-preset", "medium",
+                    "-c:a", "aac", "-shortest", output_path,
+                ]
             async with NodeTimer.timed("SceneVideoAssembler", "ffmpeg"):
                 result = subprocess.run(cmd, capture_output=True, text=True)
                 if result.returncode != 0:

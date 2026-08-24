@@ -142,6 +142,95 @@ do_log() {
     fi
 }
 
+# ── launchd install/uninstall ──────────────────────────────────────
+# 让 comfyui 开机自启 + 崩溃/被停后自动拉起, 保证 fusion-operation 补货链不因
+# comfyui 缺失而断 (库存耗尽 -> comfyui_image/tts 造片 -> enqueue).
+# 背景: 2026-08-24 comfyui 进程不在 -> 补货链 "comfyui unavailable" stop cascade
+# -> pending 持续 0 -> 4 个发布 cron 空跑 0 发布. 同 fusion-mlx/fusion-agent-studio
+# 已落地的 launchd KeepAlive 模式.
+_LAUNCHD_PLIST="${HOME}/Library/LaunchAgents/com.fusion-comfyui.server.plist"
+_LAUNCHD_LABEL="com.fusion-comfyui.server"
+
+install_launchd() {
+    if [[ -f "${_LAUNCHD_PLIST}" ]]; then
+        log "LaunchAgent already installed at ${_LAUNCHD_PLIST}"
+        log "Use 'start.sh uninstall-launchd' to remove first"
+        exit 0
+    fi
+
+    mkdir -p "$(dirname "${_LAUNCHD_PLIST}")"
+    mkdir -p "$RUN_DIR"
+
+    local py_bin
+    if [[ -x "$VENV_PYTHON" ]]; then
+        py_bin="$VENV_PYTHON"
+    else
+        py_bin="$(command -v python3)"
+        log "ERROR: no venv python at $VENV_PYTHON, falling back to ${py_bin}"
+    fi
+
+    cat > "${_LAUNCHD_PLIST}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${_LAUNCHD_LABEL}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${py_bin}</string>
+        <string>${PROJECT_DIR}/ComfyUI/main.py</string>
+        <string>--listen</string>
+        <string>${HOST}</string>
+        <string>--port</string>
+        <string>${PORT}</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>${PROJECT_DIR}</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>${LOG_FILE}</string>
+    <key>StandardErrorPath</key>
+    <string>${LOG_FILE}</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin:${VENV_DIR}/bin</string>
+        <key>HF_MIRROR</key>
+        <string>https://hf-mirror.com</string>
+        <key>HUGGINGFACE_HUB_CACHE</key>
+        <string>${HOME}/.fusion-mlx/models</string>
+        <key>PYTORCH_ENABLE_MPS_FALLBACK</key>
+        <string>1</string>
+        <key>FUSION_IMAGE_TIMEOUT</key>
+        <string>3600</string>
+        <key>FUSION_OUTPUT_DIR</key>
+        <string>${PROJECT_DIR}/output</string>
+    </dict>
+</dict>
+</plist>
+PLIST
+
+    launchctl load "${_LAUNCHD_PLIST}" 2>/dev/null || true
+    log "LaunchAgent installed and loaded: ${_LAUNCHD_PLIST}"
+    log "ComfyUI will auto-start on login and restart on crash/stop"
+    log "NOTE: FUSION_MLX_API_KEY intentionally NOT set in plist -> TTS http backend uses ~/.fusion-mlx/settings.json"
+}
+
+uninstall_launchd() {
+    if [[ ! -f "${_LAUNCHD_PLIST}" ]]; then
+        log "No LaunchAgent found at ${_LAUNCHD_PLIST}"
+        exit 0
+    fi
+
+    launchctl unload "${_LAUNCHD_PLIST}" 2>/dev/null || true
+    rm -f "${_LAUNCHD_PLIST}"
+    log "LaunchAgent uninstalled"
+}
+
 case "${1:-status}" in
     start)
         do_start
@@ -159,8 +248,14 @@ case "${1:-status}" in
         do_stop || true
         do_start
         ;;
+    install-launchd)
+        install_launchd
+        ;;
+    uninstall-launchd)
+        uninstall_launchd
+        ;;
     *)
-        echo "Usage: $0 {start|stop|status|log [-f]|restart}" >&2
+        echo "Usage: $0 {start|stop|status|log [-f]|restart|install-launchd|uninstall-launchd}" >&2
         exit 2
         ;;
 esac

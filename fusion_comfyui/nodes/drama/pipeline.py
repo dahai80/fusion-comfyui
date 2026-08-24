@@ -1,15 +1,21 @@
 import asyncio
 import logging
 import os
+import subprocess
 import sys
 
 from fusion_comfyui.core.timer import NodeTimer
-from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper, unload_all_fusion_engines
+from fusion_comfyui.core.engine_wrapper import (
+    FusionEngineWrapper,
+    unload_all_fusion_engines,
+)
 from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
 from fusion_comfyui.nodes.drama.vlm import DramaChapterParser
 from fusion_comfyui.nodes.drama.assemble import SceneVideoAssembler, ChapterVideoConcat
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s"
+)
 logger = logging.getLogger("drama_pipeline")
 
 CHARACTER_PORTRAITS = {
@@ -34,6 +40,73 @@ DEFAULT_VIDEO_FRAMES = int(os.environ.get("DRAMA_VIDEO_FRAMES", "49"))
 DEFAULT_VIDEO_FPS = int(os.environ.get("DRAMA_VIDEO_FPS", "24"))
 
 
+def _extract_last_frame(video_path: str, out_path: str) -> str | None:
+    # Extract the final video frame to out_path (PNG) for scene continuity
+    # conditioning. Returns out_path on success, None on failure (logged).
+    # Uses ffprobe for frame count then ffmpeg select=eq(n,N-1) — robust for
+    # short clips where -sseof under-reads.
+    if not os.path.exists(video_path):
+        logger.warning("last-frame extract: video missing %s", video_path)
+        return None
+    try:
+        probe = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-count_frames",
+                "-show_entries",
+                "stream=nb_read_frames",
+                "-of",
+                "csv=p=0",
+                video_path,
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        n_frames = int(probe.stdout.strip())
+        if n_frames <= 0:
+            logger.warning("last-frame extract: 0 frames in %s", video_path)
+            return None
+        last_idx = n_frames - 1
+        result = subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-loglevel",
+                "error",
+                "-i",
+                video_path,
+                "-vf",
+                f"select=eq(n\\,{last_idx})",
+                "-frames:v",
+                "1",
+                "-update",
+                "1",
+                out_path,
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0 or not os.path.exists(out_path):
+            logger.warning("last-frame extract failed: %s", result.stderr[:200])
+            return None
+        logger.info(
+            "last-frame extract: %s -> %s (frame %d/%d)",
+            video_path,
+            out_path,
+            last_idx,
+            n_frames,
+        )
+        return out_path
+    except (subprocess.CalledProcessError, ValueError) as e:
+        logger.warning("last-frame extract error on %s: %s", video_path, e)
+        return None
+
+
 async def run_chapter(chapter_text: str, chapter_title: str = "chapter"):
     logger.info("=== Drama Pipeline: %s ===", chapter_title)
 
@@ -55,7 +128,9 @@ async def run_chapter(chapter_text: str, chapter_title: str = "chapter"):
     pulid_model_dir = os.environ.get("PULID_MODEL_DIR", "")
     skip_pulid = not bool(pulid_model_dir)
     if skip_pulid:
-        logger.info("[Phase 2] PULID_MODEL_DIR not set, skipping PuLID identity extraction")
+        logger.info(
+            "[Phase 2] PULID_MODEL_DIR not set, skipping PuLID identity extraction"
+        )
 
     # Phase 3: Generate scene media (video if DRAMA_VIDEO_MODEL set, else image)
     # Read env at call time (not import) so tests + runtime can toggle per-run.
@@ -66,8 +141,17 @@ async def run_chapter(chapter_text: str, chapter_title: str = "chapter"):
     scene_videos = []
     scene_audios = []
 
-    model_name = video_model if use_video else os.environ.get("DRAMA_MODEL", DEFAULT_MODEL)
-    model = FusionEngineWrapper(model_name, offload_strategy="sequential", quant_bit="none")
+    model_name = (
+        video_model if use_video else os.environ.get("DRAMA_MODEL", DEFAULT_MODEL)
+    )
+    model = FusionEngineWrapper(
+        model_name, offload_strategy="sequential", quant_bit="none"
+    )
+
+    # Scene visual continuity: previous scene's final frame conditions the
+    # next scene's first frame (H3 i2va keyframe). Cleared after the loop.
+    prev_last_frame = ""
+    continuity_frames = []
 
     # Optional TTS engine (loaded once, reused per scene)
     tts_engine = None
@@ -91,7 +175,17 @@ async def run_chapter(chapter_text: str, chapter_title: str = "chapter"):
 
         try:
             if use_video:
-                video_path = os.path.join(output_dir, f"{chapter_title}_scene_{scene_id}.mp4")
+                video_path = os.path.join(
+                    output_dir, f"{chapter_title}_scene_{scene_id}.mp4"
+                )
+                continuity_kwargs = {}
+                if prev_last_frame and os.path.exists(prev_last_frame):
+                    continuity_kwargs["image"] = prev_last_frame
+                    logger.info(
+                        "[Phase 3] Scene %d continuity: first-frame from %s",
+                        scene_id,
+                        prev_last_frame,
+                    )
                 video_path = await model.generate_video(
                     prompt=desc_en,
                     num_frames=DEFAULT_VIDEO_FRAMES,
@@ -101,11 +195,24 @@ async def run_chapter(chapter_text: str, chapter_title: str = "chapter"):
                     output_path=video_path,
                     fps=DEFAULT_VIDEO_FPS,
                     quantize=DEFAULT_QUANTIZE,
+                    **continuity_kwargs,
                 )
                 scene_videos.append(video_path)
                 logger.info("[Phase 3] Scene %d video saved: %s", scene_id, video_path)
+                # Extract this scene's last frame for the next scene's continuity.
+                next_frame = os.path.join(
+                    output_dir, f"{chapter_title}_scene_{scene_id}_last.png"
+                )
+                extracted = _extract_last_frame(video_path, next_frame)
+                if extracted:
+                    prev_last_frame = extracted
+                    continuity_frames.append(extracted)
+                else:
+                    prev_last_frame = ""
             else:
-                frame_path = os.path.join(output_dir, f"{chapter_title}_scene_{scene_id}.png")
+                frame_path = os.path.join(
+                    output_dir, f"{chapter_title}_scene_{scene_id}.png"
+                )
                 png_bytes = await model.generate_image(
                     prompt=desc_en,
                     negative_prompt="low quality, blurry, deformed, watermark, text",
@@ -118,13 +225,25 @@ async def run_chapter(chapter_text: str, chapter_title: str = "chapter"):
                 with open(frame_path, "wb") as f:
                     f.write(png_bytes)
                 scene_videos.append(frame_path)
-                logger.info("[Phase 3] Scene %d image saved: %s (%d bytes)", scene_id, frame_path, len(png_bytes))
+                logger.info(
+                    "[Phase 3] Scene %d image saved: %s (%d bytes)",
+                    scene_id,
+                    frame_path,
+                    len(png_bytes),
+                )
         except Exception as e:
-            logger.warning("[Phase 3] Gen failed for scene %d: %s — placeholder", scene_id, e)
+            logger.warning(
+                "[Phase 3] Gen failed for scene %d: %s — placeholder", scene_id, e
+            )
             if use_video:
                 from PIL import Image as PILImage
-                placeholder = os.path.join(output_dir, f"{chapter_title}_scene_{scene_id}.png")
-                PILImage.new("RGB", (DEFAULT_WIDTH, DEFAULT_HEIGHT), (128, 128, 128)).save(placeholder)
+
+                placeholder = os.path.join(
+                    output_dir, f"{chapter_title}_scene_{scene_id}.png"
+                )
+                PILImage.new(
+                    "RGB", (DEFAULT_WIDTH, DEFAULT_HEIGHT), (128, 128, 128)
+                ).save(placeholder)
                 scene_videos.append(placeholder)
             FusionMemoryGuardian.purge_memory()
 
@@ -132,9 +251,15 @@ async def run_chapter(chapter_text: str, chapter_title: str = "chapter"):
         audio_path = ""
         if tts_engine and dialogue:
             try:
-                full_line = " ".join(str(d) for d in dialogue) if isinstance(dialogue, list) else str(dialogue)
+                full_line = (
+                    " ".join(str(d) for d in dialogue)
+                    if isinstance(dialogue, list)
+                    else str(dialogue)
+                )
                 wav_bytes = await tts_engine.tts_synthesize(text=full_line, speed=1.0)
-                audio_path = os.path.join(output_dir, f"{chapter_title}_scene_{scene_id}.wav")
+                audio_path = os.path.join(
+                    output_dir, f"{chapter_title}_scene_{scene_id}.wav"
+                )
                 with open(audio_path, "wb") as f:
                     f.write(wav_bytes)
                 logger.info("[Phase 3] Scene %d TTS saved: %s", scene_id, audio_path)
@@ -152,6 +277,14 @@ async def run_chapter(chapter_text: str, chapter_title: str = "chapter"):
         await tts_engine.stop()
     FusionMemoryGuardian.purge_memory()
 
+    # Clean continuity temp frames (intermediate, not final output)
+    for frame_path in continuity_frames:
+        try:
+            os.unlink(frame_path)
+        except OSError:
+            pass
+    logger.info("[Phase 3.5] Cleaned %d continuity temp frames", len(continuity_frames))
+
     # Phase 4: Assemble scenes
     logger.info("[Phase 4] Assembling chapter video...")
     assembled_scenes = []
@@ -161,7 +294,9 @@ async def run_chapter(chapter_text: str, chapter_title: str = "chapter"):
             continue
         audio = scene_audios[idx] if idx < len(scene_audios) else ""
         subtitle = scenes[idx].get("description_cn", "") if idx < len(scenes) else ""
-        scene_dur = float(scenes[idx].get("duration_seconds", 5)) if idx < len(scenes) else 5.0
+        scene_dur = (
+            float(scenes[idx].get("duration_seconds", 5)) if idx < len(scenes) else 5.0
+        )
         try:
             assembler = SceneVideoAssembler()
             result = await assembler.execute(

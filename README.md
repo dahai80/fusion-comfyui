@@ -98,8 +98,14 @@ fusion-comfyui depends on [fusion-mlx](https://github.com/dahai80/fusion-mlx) as
 its MLX inference engine. Unlike other fusion-* services that reach fusion-mlx
 over HTTP (`localhost:11434`), **fusion-comfyui imports fusion-mlx in-process**:
 `fusion_comfyui_plugin/__init__.py` installs the `fusion_mlx._torch_stub` shim,
-and `core/engine_wrapper.py` calls `fusion_mlx.engines` directly within the same
-Python process.
+and the engine/pipeline wrapper code imports fusion-mlx engine classes
+(`ImageGenEngine`, `VideoGenEngine`, `TTSEngine`, `LipsyncPipelineMLX`,
+`PuLIDPipeline`, etc.) from the stable `fusion_mlx.public_api` layer
+(landed by fusion-mlx PR #620, closes #613) within the same Python process.
+Four symbols not yet in `public_api.__all__` (`EnginePool`,
+`list_available_models`, `MuseTalkPipeline`, `VLMBatchedEngine`) stay on
+internal module paths with `TODO(upstream #624)` markers pending the
+upstream #624 addition.
 
 This is a deliberate, declared exception to the monorepo HTTP-routing convention
 (documented in `architecture/netlayer-compliance-plan.md` §5.5):

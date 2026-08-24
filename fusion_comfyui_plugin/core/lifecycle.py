@@ -24,16 +24,28 @@ class FusionMemoryGuardian:
         gc.collect()
         try:
             import mlx.core as mx
-            mx.metal.clear_cache()
-            active = mx.metal.get_active_memory()
-            peak = mx.metal.get_peak_memory()
+            # mx.metal.clear_cache() is deprecated and corrupts live Metal
+            # command buffers when flushed mid-generation: the next mx.eval
+            # aborts with "[METAL] Command buffer execution failed: Invalid
+            # Resource (kIOGPUCommandBufferCallbackErrorInvalidResource)".
+            # Use the non-deprecated mx.clear_cache() which is safe to call
+            # between ops. Memory getters likewise moved off mx.metal.*.
+            clear = getattr(mx, "clear_cache", None)
+            if clear is not None:
+                clear()
+            else:
+                mx.metal.clear_cache()
+            active_fn = getattr(mx, "get_active_memory", None) or mx.metal.get_active_memory
+            peak_fn = getattr(mx, "get_peak_memory", None) or mx.metal.get_peak_memory
+            active = active_fn()
+            peak = peak_fn()
             logger.debug(
                 "FusionMemoryGuardian purge: active=%.1fMB peak=%.1fMB",
                 active / 1024 / 1024,
                 peak / 1024 / 1024,
             )
         except Exception as e:
-            logger.warning("FusionMemoryGuardian: mx.metal.clear_cache failed: %s", e)
+            logger.warning("FusionMemoryGuardian: clear_cache failed: %s", e)
 
         if deep_clean:
             gc.collect()
@@ -42,7 +54,8 @@ class FusionMemoryGuardian:
     def maybe_purge(cls, threshold_mb=_PURGE_THRESHOLD_MB):
         try:
             import mlx.core as mx
-            active_mb = mx.metal.get_active_memory() / 1024 / 1024
+            active_fn = getattr(mx, "get_active_memory", None) or mx.metal.get_active_memory
+            active_mb = active_fn() / 1024 / 1024
             if active_mb < threshold_mb:
                 logger.debug(
                     "FusionMemoryGuardian maybe_purge: skipping, active=%.0fMB < threshold=%dMB",

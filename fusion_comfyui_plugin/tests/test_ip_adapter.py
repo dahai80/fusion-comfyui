@@ -166,6 +166,30 @@ class TestFluxIPAdapterPipeline:
         for proc in pipeline.attn_processors.values():
             assert proc._image_embeds is None
 
+    def test_set_image_embeds_materializes_to_concrete_mx_array(self):
+        # Regression guard: embeds created on a producer thread (ComfyUI main
+        # thread) must be materialized into a NEW concrete MLX buffer so a
+        # consumer on the image-executor worker thread can read them without a
+        # cross-stream "There is no Stream(gpu, 0) in current thread" error.
+        # The fix must NOT store the producer's lazy array by reference; it
+        # must copy+eval so the stored buffer is a standalone concrete GPU
+        # resource. Asserting the stored object is a distinct mx.array (not the
+        # raw numpy input, not the lazy producer array by identity) catches a
+        # regression where the materialization step is dropped.
+        import mlx.core as mx
+
+        pipeline = FluxIPAdapterPipeline()
+        pipeline._init_default_processors()
+        np_embeds = np.zeros((1, 128, 4096), dtype=np.float32)
+        pipeline.set_image_embeds(np_embeds)
+        for proc in pipeline.attn_processors.values():
+            stored = proc._image_embeds
+            assert isinstance(stored, mx.array), (
+                "stored embeds must be mx.array (materialized), got %s" % type(stored)
+            )
+            assert stored is not np_embeds, "stored embeds must be a copy, not the numpy input"
+            mx.eval(stored)
+
     def test_update_scale_and_range(self):
         pipeline = FluxIPAdapterPipeline()
         pipeline._init_default_processors()

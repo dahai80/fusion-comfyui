@@ -187,7 +187,20 @@ class IPAFluxAttnProcessor(nn.Module):
         self._image_embeds = None
 
     def set_image_embeds(self, embeds):
-        self._image_embeds = embeds
+        # Materialize embeds into a concrete MLX buffer before storing. Embeds
+        # are produced on the ComfyUI main thread (get_image_embeds) but
+        # consumed inside the patched transformer __call__ on the image-executor
+        # worker thread. A lazy or numpy array accessed cross-thread raises
+        # "There is no Stream(gpu, 0) in current thread" at to_k_ip/to_v_ip
+        # time. A copy+eval here yields a standalone concrete GPU resource
+        # readable from any stream. See ip-adapter-status memory.
+        import mlx.core as _mx
+        if isinstance(embeds, _mx.array):
+            materialized = _mx.array(embeds, dtype=_mx.float16)
+        else:
+            materialized = _mx.array(np.asarray(embeds), dtype=_mx.float16)
+        _mx.eval(materialized)
+        self._image_embeds = materialized
 
     def clear_image_embeds(self):
         self._image_embeds = None
@@ -473,8 +486,33 @@ class FluxIPAdapterPipeline:
         pipeline = cls(num_tokens=num_tokens, dtype=dtype)
         pipeline._load_siglip(siglip_dir, dtype)
         pipeline._load_ip_adapter(ip_ckpt_path, num_tokens, dtype)
+        pipeline._materialize_weights()
         pipeline._loaded = True
         return pipeline
+
+    def _materialize_weights(self):
+        # Eval all loaded params into concrete GPU buffers. Weights are loaded
+        # on the ComfyUI main thread but consumed inside the patched
+        # transformer __call__ on the image-executor worker thread. Lazy
+        # params accessed cross-thread raise "There is no Stream(gpu, 0) in
+        # current thread" at to_k_ip/to_v_ip time (issue #170 constraint).
+        # Concrete buffers are stream-independent. See ip-adapter-status memory.
+        # nn.Module.parameters() returns a nested dict pytree; mx.eval walks
+        # the pytree recursively, so pass each dict directly (NOT a flat list
+        # of dict keys, which extend() would produce).
+        param_trees = []
+        if self.vision_encoder is not None:
+            param_trees.append(self.vision_encoder.parameters())
+        if self.image_proj_model is not None:
+            param_trees.append(self.image_proj_model.parameters())
+        for proc in self.attn_processors.values():
+            param_trees.append(proc.parameters())
+        if param_trees:
+            mx.eval(*param_trees)
+            logger.info(
+                "IP-Adapter materialized %d param pytrees (cross-thread safe)",
+                len(param_trees),
+            )
 
     def _load_siglip(self, siglip_dir, dtype):
         self.vision_encoder = SigLIPVisionEncoder()
@@ -584,6 +622,10 @@ class FluxIPAdapterPipeline:
         clip_embeds = self.vision_encoder(pixel_values)
         logger.debug("SigLIP pooler_output shape=%s", clip_embeds.shape)
         image_prompt_embeds = self.image_proj_model(clip_embeds)
+        # Materialize before the embeds cross threads (producer thread ->
+        # image-executor consumer thread). A lazy graph evaluated on the wrong
+        # stream raises "There is no Stream(gpu, 0) in current thread".
+        mx.eval(image_prompt_embeds)
         logger.debug("IP-Adapter image_embeds shape=%s", image_prompt_embeds.shape)
         return image_prompt_embeds
 
@@ -827,7 +869,11 @@ def _resolve_siglip_path(model_name="siglip-so400m-patch14-384"):
 
 
 def _image_to_np(image):
-    arr = np.array(image, copy=False)
+    # numpy 2.x: np.asarray/np.array(copy=False) rejects implicit copy via
+    # __array__. Force an explicit copy with np.array(image) (copy=True
+    # default) so any tensor/array-like that exports __array__ converts
+    # cleanly regardless of backend (torch, mlx shim, PIL, ndarray).
+    arr = np.array(image)
     if arr.max() > 1.0:
         arr = arr.astype(np.float32) / 255.0
     if arr.ndim == 4:

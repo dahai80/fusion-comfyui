@@ -1,3 +1,13 @@
+import shutil
+
+import pytest
+
+# Some tests synthesize a tiny MP4 via the real `ffmpeg` binary then exercise
+# _extract_last_frame / scene-continuity. CI macOS runners lack ffmpeg, so
+# skip those (local envs with ffmpeg still run them).
+_has_ffmpeg = shutil.which("ffmpeg") is not None
+
+
 class TestGenerateVideo:
     async def test_generate_video_writes_mp4_and_returns_path(
         self, monkeypatch, tmp_path
@@ -292,6 +302,7 @@ class TestNativeAudioAssembler:
         assert not has_filter, f"legacy path no amix, got {cmd}"
         assert "-shortest" in cmd, "legacy path keeps -shortest"
 class TestExtractLastFrame:
+    @pytest.mark.skipif(not _has_ffmpeg, reason="ffmpeg not installed")
     def test_extracts_final_frame_png(self, tmp_path):
         import subprocess
         from fusion_comfyui.nodes.drama.pipeline import _extract_last_frame
@@ -329,6 +340,7 @@ class TestExtractLastFrame:
 
 
 class TestSceneContinuity:
+    @pytest.mark.skipif(not _has_ffmpeg, reason="ffmpeg not installed")
     async def test_second_scene_receives_first_frame_image(self, monkeypatch, tmp_path):
         # Real temp MP4s so _extract_last_frame produces a valid PNG that
         # scene 2 forwards as image= (H3 i2va continuity keyframe).

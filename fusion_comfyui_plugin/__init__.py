@@ -19,6 +19,8 @@ def _install_torch_stub():
     if _torch_stub_installed:
         return
     try:
+        # _torch_stub is meta-install plumbing, not a public consumer symbol;
+        # intentionally stays on internal path (out of scope for #624).
         from fusion_mlx._torch_stub import install as stub_install
         if stub_install():
             logger.info("ComfyUI-Fusion-MLX: torch stub installed (zero-PyTorch mode)")

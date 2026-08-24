@@ -117,7 +117,7 @@ class FusionIdentityLoader:
     async def _load_pipeline(self, model_path, dtype):
         import mlx.core as mx
         mx_dtype = getattr(mx, dtype, mx.float16)
-        from fusion_mlx.video.pulid_mlx.pipeline import PuLIDPipeline
+        from fusion_mlx.public_api import PuLIDPipeline
         pipeline = PuLIDPipeline.from_pretrained(model_path, dtype=mx_dtype)
         return pipeline
 

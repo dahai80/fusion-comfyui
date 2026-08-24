@@ -16,7 +16,7 @@ MODEL_BASE = os.path.expanduser("~/.fusion-mlx/models")
 
 
 def bench_image_generation(model_path=None, num_runs=3, steps=4):
-    from fusion_mlx.engines.image_gen import ImageGenEngine
+    from fusion_mlx.public_api import ImageGenEngine
     from core.lifecycle import FusionMemoryGuardian
 
     if model_path is None:
@@ -89,7 +89,7 @@ def bench_image_generation(model_path=None, num_runs=3, steps=4):
 
 
 def bench_video_generation(model_path=None, num_runs=2, steps=4):
-    from fusion_mlx.engines.video import VideoGenEngine
+    from fusion_mlx.public_api import VideoGenEngine
     from core.lifecycle import FusionMemoryGuardian
 
     if model_path is None:

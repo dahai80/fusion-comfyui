@@ -117,7 +117,7 @@ class FusionLipsyncLoader:
     async def _load_pipeline(self, model_path, dtype):
         import mlx.core as mx
         mx_dtype = getattr(mx, dtype, mx.float16)
-        from fusion_mlx.video.latentsync_mlx.pipeline import LipsyncPipelineMLX
+        from fusion_mlx.public_api import LipsyncPipelineMLX
         pipeline = LipsyncPipelineMLX.from_pretrained(model_path, dtype=mx_dtype)
         return pipeline
 

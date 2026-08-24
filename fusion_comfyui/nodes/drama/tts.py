@@ -26,7 +26,7 @@ class FusionTTS(BaseNode):
 
     async def execute(self, text, model_name="mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit", voice="", ref_audio="", speed=1.0):
         async with NodeTimer.timed("FusionTTS", "full", text_len=len(text)):
-            from fusion_mlx.engines.tts import TTSEngine
+            from fusion_mlx.public_api import TTSEngine
 
             async with NodeTimer.timed("FusionTTS", "load_engine"):
                 engine = TTSEngine(model_name)

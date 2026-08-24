@@ -77,6 +77,7 @@ async def unload_all_fusion_engines():
     """
     logger.info("unload_all_fusion_engines: starting full unload")
     try:
+        # TODO(upstream #624): EnginePool not in public_api stable layer yet.
         from fusion_mlx.pool.engine_pool import EnginePool
         pool = EnginePool.get_instance()
         if pool:
@@ -154,7 +155,7 @@ class FusionEngineWrapper:
         async with NodeTimer.timed(self.model_name, "engine_start"):
             model_path = self._resolve_model_path()
             if self.model_type == "image":
-                from fusion_mlx.engines.image_gen import ImageGenEngine
+                from fusion_mlx.public_api import ImageGenEngine
                 quantize = None
                 if self.quant_bit in ("4bit", "w4", "nf4"):
                     quantize = 4
@@ -162,7 +163,7 @@ class FusionEngineWrapper:
                     quantize = 8
                 self._engine = ImageGenEngine(model_path, quantize=quantize)
             elif self.model_type == "video":
-                from fusion_mlx.engines.video import VideoGenEngine
+                from fusion_mlx.public_api import VideoGenEngine
                 self._engine = VideoGenEngine(model_path)
             await self._engine.start()
             self._started = True
@@ -173,6 +174,7 @@ class FusionEngineWrapper:
         if os.path.isdir(self.model_name):
             return self.model_name
         try:
+            # TODO(upstream #624): list_available_models not in public_api yet.
             from fusion_mlx.model_registry import list_available_models
             model_type = "image" if self.model_type == "image" else "video"
             for m in list_available_models(model_type):
@@ -451,7 +453,7 @@ class FusionEngineWrapper:
 
     async def load_pulid(self, model_dir: str):
         async with NodeTimer.timed("PuLID", "load_pipeline", model_dir=model_dir):
-            from fusion_mlx.video.pulid_mlx import PuLIDPipeline
+            from fusion_mlx.public_api import PuLIDPipeline
             self._pulid_pipeline = PuLIDPipeline.from_pretrained(model_dir)
             logger.info("PuLID pipeline loaded from %s", model_dir)
 
@@ -497,7 +499,7 @@ class FusionEngineWrapper:
 
     async def load_lipsync(self, model_dir: str):
         async with NodeTimer.timed("LatentSync", "load_pipeline", model_dir=model_dir):
-            from fusion_mlx.video.latentsync_mlx import LipsyncPipelineMLX
+            from fusion_mlx.public_api import LipsyncPipelineMLX
             self._lipsync_pipeline = LipsyncPipelineMLX.from_pretrained(model_dir)
             logger.info("LatentSync pipeline loaded from %s", model_dir)
 
@@ -528,6 +530,7 @@ class FusionEngineWrapper:
 
     async def load_musetalk(self, weights_root: str = "", dist_dir: str = ""):
         async with NodeTimer.timed("MuseTalk", "load_pipeline"):
+            # TODO(upstream #624): MuseTalkPipeline not in public_api yet.
             from fusion_mlx.video.musetalk_mlx import MuseTalkPipeline
             if dist_dir:
                 self._musetalk_pipeline = MuseTalkPipeline.from_pretrained_mlx(dist_dir)
@@ -550,7 +553,7 @@ class FusionEngineWrapper:
 
     async def load_tts(self, model_name: str):
         async with NodeTimer.timed("TTS", "load_engine", model=model_name):
-            from fusion_mlx.engines.tts import TTSEngine
+            from fusion_mlx.public_api import TTSEngine
             self._tts_engine = TTSEngine(model_name)
             await self._tts_engine.start()
             logger.info("TTS engine started: %s", model_name)
@@ -582,6 +585,7 @@ class FusionEngineWrapper:
 
     async def load_vlm(self, model_name: str):
         async with NodeTimer.timed("VLM", "load_engine", model=model_name):
+            # TODO(upstream #624): VLMBatchedEngine not in public_api yet.
             from fusion_mlx.engines.vlm import VLMBatchedEngine
             self._vlm_engine = VLMBatchedEngine(model_name)
             await self._vlm_engine.start()

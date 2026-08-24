@@ -53,7 +53,7 @@ class FusionLipSync(BaseNode):
         self, video_path, audio_path, output_path, model_dir,
         num_frames, num_inference_steps, guidance_scale, seed,
     ):
-        from fusion_mlx.video.latentsync_mlx import LipsyncPipelineMLX
+        from fusion_mlx.public_api import LipsyncPipelineMLX
 
         async with NodeTimer.timed("FusionLipSync", "load_latentsync"):
             pipeline = LipsyncPipelineMLX.from_pretrained(model_dir)
@@ -79,6 +79,7 @@ class FusionLipSync(BaseNode):
     async def _run_musetalk(self, video_path, audio_path, output_path, model_dir):
         import subprocess
 
+        # TODO(upstream #624): MuseTalkPipeline not in public_api yet.
         from fusion_mlx.video.musetalk_mlx import MuseTalkPipeline
 
         async with NodeTimer.timed("FusionLipSync", "load_musetalk"):

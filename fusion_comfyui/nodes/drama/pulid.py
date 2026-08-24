@@ -45,7 +45,7 @@ class PuLIDIdentityExtract(BaseNode):
             rgb_uint8 = arr.astype(np.uint8)
             bgr_uint8 = rgb_uint8[:, :, ::-1].copy()
 
-            from fusion_mlx.video.pulid_mlx import PuLIDPipeline
+            from fusion_mlx.public_api import PuLIDPipeline
             async with NodeTimer.timed("PuLIDIdentityExtract", "load_pipeline"):
                 pipeline = PuLIDPipeline.from_pretrained(model_dir)
 

@@ -436,7 +436,7 @@ class FusionIdentityPipelineNode:
 
     async def _generate(self, pipeline, bgr_image, prompt, negative_prompt,
                          width, height, steps, cfg, identity_weight, seed):
-        from fusion_mlx.video.pulid_mlx.pipeline import PuLIDPipeline
+        from fusion_mlx.public_api import PuLIDPipeline
         cache_key = "pulid_flux_v0.9.1"
         pulid = _pulid_cache.get(cache_key)
         if pulid is None:

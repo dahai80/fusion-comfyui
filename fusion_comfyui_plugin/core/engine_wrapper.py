@@ -51,7 +51,7 @@ class FusionEngineWrapper:
             return
         logger.info("Starting fusion-mlx engine: %s", self.model_name)
         if self.model_type == "image":
-            from fusion_mlx.engines.image_gen import ImageGenEngine
+            from fusion_mlx.public_api import ImageGenEngine
             quantize = None
             if self.quant_bit in ("4bit", "w4", "nf4"):
                 quantize = 4
@@ -59,7 +59,7 @@ class FusionEngineWrapper:
                 quantize = 8
             self._engine = ImageGenEngine(self.model_name, quantize=quantize)
         elif self.model_type == "video":
-            from fusion_mlx.engines.video import VideoGenEngine
+            from fusion_mlx.public_api import VideoGenEngine
             self._engine = VideoGenEngine(self.model_name)
         await self._engine.start()
         self._started = True

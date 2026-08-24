@@ -36,7 +36,7 @@ def _resolve_mlx_base_url():
     if base:
         return base.rstrip("/")
     try:
-        from fusion_mlx.config import get_config
+        from fusion_mlx.public_api import get_config
 
         c = get_config()
         host = getattr(c, "host", "127.0.0.1") or "127.0.0.1"
@@ -66,7 +66,7 @@ _TTS_MODEL_ALIASES = {
 def _list_tts_models() -> list:
     models = list(_KNOWN_TTS_MODELS)
     try:
-        from fusion_mlx.model_registry import get_registry
+        from fusion_mlx.public_api import get_registry
         reg = get_registry()
         for name, info in reg.items():
             if info.get("type") == "tts" and name not in models:
@@ -102,7 +102,7 @@ class FusionVoiceLoaderNode:
         logger.info("FusionVoiceLoader: loading %s", resolved)
 
         try:
-            from fusion_mlx import TTSEngine
+            from fusion_mlx.public_api import TTSEngine
             engine = TTSEngine(model_name=resolved)
         except ImportError:
             logger.warning("fusion_mlx.TTSEngine not available, trying mlx_audio direct")

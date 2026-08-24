@@ -21,6 +21,7 @@ def set_global_step_callback(cb: StepCallback | None):
 
 def get_available_models() -> list[str]:
     try:
+        # TODO(upstream #624): list_available_models not in public_api yet.
         from fusion_mlx.model_registry import list_available_models as _list_models
         image_models = [m["name"] for m in _list_models("image")]
         video_models = [m["name"] for m in _list_models("video")]

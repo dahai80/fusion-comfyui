@@ -257,7 +257,7 @@ def _fallback_model(requested: str) -> str:
 
 def _resolve_model_path(model_name: str) -> str:
     try:
-        from fusion_mlx.model_registry import get_registry
+        from fusion_mlx.public_api import get_registry
         reg = get_registry()
         info = reg.get(model_name)
         if info and hasattr(info, "get") and info.get("path"):

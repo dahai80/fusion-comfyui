@@ -18,6 +18,12 @@ export FUSION_OUTPUT_DIR="${FUSION_OUTPUT_DIR:-$PROJECT_DIR/output}"
 # Match fusion-mlx's model cache so hf_hub_download finds already-downloaded
 # models (SD1.5, etc.) under ~/.fusion-mlx/models without re-downloading.
 export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-$HOME/.fusion-mlx/models}"
+# Force HF/transformers offline: models live in the cache above, so any network
+# probe (e.g. transformers 5.x list_repo_templates on a repo-id tokenizer load,
+# fusion-mlx wan2 umt5-xxl) only wastes time and times out when the mirror is
+# unreachable. HF_HUB_OFFLINE=1 makes huggingface_hub skip the network entirely.
+export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
+export TRANSFORMERS_OFFLINE="${TRANSFORMERS_OFFLINE:-1}"
 # Image-gen per-call timeout (fusion-mlx #481). SD1.5 1024 img2img (hires-fix
 # 2nd pass) can exceed the 600s default on Apple Silicon.
 export FUSION_IMAGE_TIMEOUT="${FUSION_IMAGE_TIMEOUT:-3600}"
@@ -203,6 +209,10 @@ install_launchd() {
         <string>https://hf-mirror.com</string>
         <key>HUGGINGFACE_HUB_CACHE</key>
         <string>${HOME}/.fusion-mlx/models</string>
+        <key>HF_HUB_OFFLINE</key>
+        <string>1</string>
+        <key>TRANSFORMERS_OFFLINE</key>
+        <string>1</string>
         <key>PYTORCH_ENABLE_MPS_FALLBACK</key>
         <string>1</string>
         <key>FUSION_IMAGE_TIMEOUT</key>

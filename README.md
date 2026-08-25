@@ -102,10 +102,12 @@ and the engine/pipeline wrapper code imports fusion-mlx engine classes
 (`ImageGenEngine`, `VideoGenEngine`, `TTSEngine`, `LipsyncPipelineMLX`,
 `PuLIDPipeline`, etc.) from the stable `fusion_mlx.public_api` layer
 (landed by fusion-mlx PR #620, closes #613) within the same Python process.
-Four symbols not yet in `public_api.__all__` (`EnginePool`,
-`list_available_models`, `MuseTalkPipeline`, `VLMBatchedEngine`) stay on
-internal module paths with `TODO(upstream #624)` markers pending the
-upstream #624 addition.
+The four symbols previously deferred to internal module paths
+(`EnginePool`, `list_available_models`, `MuseTalkPipeline`,
+`VLMBatchedEngine`) were added to `public_api.__all__` by fusion-mlx PR #625
+(closes upstream #624, released v0.8.36) and are now imported from
+`fusion_mlx.public_api` too — all `TODO(upstream #624)` markers removed,
+dependency floor raised to `fusion-mlx>=0.8.36`.
 
 This is a deliberate, declared exception to the monorepo HTTP-routing convention
 (documented in `architecture/netlayer-compliance-plan.md` §5.5):

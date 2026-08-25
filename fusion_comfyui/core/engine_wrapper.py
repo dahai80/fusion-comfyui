@@ -77,8 +77,7 @@ async def unload_all_fusion_engines():
     """
     logger.info("unload_all_fusion_engines: starting full unload")
     try:
-        # TODO(upstream #624): EnginePool not in public_api stable layer yet.
-        from fusion_mlx.pool.engine_pool import EnginePool
+        from fusion_mlx.public_api import EnginePool
         pool = EnginePool.get_instance()
         if pool:
             await pool.shutdown()
@@ -174,8 +173,7 @@ class FusionEngineWrapper:
         if os.path.isdir(self.model_name):
             return self.model_name
         try:
-            # TODO(upstream #624): list_available_models not in public_api yet.
-            from fusion_mlx.model_registry import list_available_models
+            from fusion_mlx.public_api import list_available_models
             model_type = "image" if self.model_type == "image" else "video"
             for m in list_available_models(model_type):
                 if m["name"] == self.model_name:
@@ -530,8 +528,7 @@ class FusionEngineWrapper:
 
     async def load_musetalk(self, weights_root: str = "", dist_dir: str = ""):
         async with NodeTimer.timed("MuseTalk", "load_pipeline"):
-            # TODO(upstream #624): MuseTalkPipeline not in public_api yet.
-            from fusion_mlx.video.musetalk_mlx import MuseTalkPipeline
+            from fusion_mlx.public_api import MuseTalkPipeline
             if dist_dir:
                 self._musetalk_pipeline = MuseTalkPipeline.from_pretrained_mlx(dist_dir)
             else:
@@ -585,8 +582,7 @@ class FusionEngineWrapper:
 
     async def load_vlm(self, model_name: str):
         async with NodeTimer.timed("VLM", "load_engine", model=model_name):
-            # TODO(upstream #624): VLMBatchedEngine not in public_api yet.
-            from fusion_mlx.engines.vlm import VLMBatchedEngine
+            from fusion_mlx.public_api import VLMBatchedEngine
             self._vlm_engine = VLMBatchedEngine(model_name)
             await self._vlm_engine.start()
             logger.info("VLM engine started: %s", model_name)

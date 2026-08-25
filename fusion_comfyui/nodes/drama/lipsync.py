@@ -79,8 +79,7 @@ class FusionLipSync(BaseNode):
     async def _run_musetalk(self, video_path, audio_path, output_path, model_dir):
         import subprocess
 
-        # TODO(upstream #624): MuseTalkPipeline not in public_api yet.
-        from fusion_mlx.video.musetalk_mlx import MuseTalkPipeline
+        from fusion_mlx.public_api import MuseTalkPipeline
 
         async with NodeTimer.timed("FusionLipSync", "load_musetalk"):
             pipeline = MuseTalkPipeline.from_pretrained_mlx(model_dir) if model_dir else MuseTalkPipeline.from_pretrained("")

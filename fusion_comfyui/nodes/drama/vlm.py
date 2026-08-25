@@ -49,8 +49,7 @@ class DramaChapterParser(BaseNode):
         async with NodeTimer.timed("DramaChapterParser", "full", text_len=len(chapter_text)):
             scenes = self._split_text_to_scenes(chapter_text)
 
-            # TODO(upstream #624): VLMBatchedEngine not in public_api yet.
-            from fusion_mlx.engines.vlm import VLMBatchedEngine
+            from fusion_mlx.public_api import VLMBatchedEngine
 
             async with NodeTimer.timed("DramaChapterParser", "load_vlm"):
                 engine = VLMBatchedEngine(vlm_model)

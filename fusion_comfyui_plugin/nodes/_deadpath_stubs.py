@@ -29,35 +29,31 @@ def _stub_factory(native_cls_name, native_module, message):
 ConditioningSetMaskStub = _stub_factory(
     "ConditioningSetMask", "nodes",
     "ConditioningSetMask: regional-mask conditioning is not supported on the fusion-mlx "
-    "pipeline (engine has no mask hook); use Fusion* nodes or wait for P3 staged conditioning.",
+    "pipeline (engine has no mask hook, upstream issue #653); use Fusion* nodes or wait "
+    "for the upstream mask-conditioning surface.",
 )
 VAEEncodeForInpaintStub = _stub_factory(
     "VAEEncodeForInpaint", "nodes",
-    "VAEEncodeForInpaint: routes into a PyTorch model layer not yet ported to MLX (P5); "
-    "use the Fusion* equivalent or wait for the comfy/ core fork.",
+    "VAEEncodeForInpaint: VAE-encode + mask surfaces not exposed on the fusion-mlx engine "
+    "(upstream issue #653); use the Fusion* equivalent or wait for the upstream surface.",
 )
 InpaintModelConditioningStub = _stub_factory(
     "InpaintModelConditioning", "nodes",
-    "InpaintModelConditioning: routes into a PyTorch model layer not yet ported to MLX (P5); "
-    "use the Fusion* equivalent or wait for the comfy/ core fork.",
+    "InpaintModelConditioning: inpaint/mask conditioning surface not exposed on the fusion-mlx "
+    "engine (upstream issue #653); use the Fusion* equivalent or wait for the upstream surface.",
 )
 ControlNetApplyStub = _stub_factory(
     "ControlNetApply", "nodes",
-    "ControlNetApply: routes into a PyTorch model layer not yet ported to MLX (P5); "
-    "use the Fusion* equivalent or wait for the comfy/ core fork.",
+    "ControlNetApply: controlnet conditioning surface not exposed on the fusion-mlx engine "
+    "(upstream issue #653); use the Fusion* equivalent or wait for the upstream surface.",
 )
 ControlNetApplyAdvancedStub = _stub_factory(
     "ControlNetApplyAdvanced", "nodes",
-    "ControlNetApplyAdvanced: routes into a PyTorch model layer not yet ported to MLX (P5); "
-    "use the Fusion* equivalent or wait for the comfy/ core fork.",
-)
-PainterNodeStub = _stub_factory(
-    "PainterNode", "comfy_extras.nodes_painter",
-    "PainterNode: routes into a PyTorch model layer not yet ported to MLX (P5); "
-    "use the Fusion* equivalent or wait for the comfy/ core fork.",
+    "ControlNetApplyAdvanced: controlnet conditioning surface not exposed on the fusion-mlx "
+    "engine (upstream issue #653); use the Fusion* equivalent or wait for the upstream surface.",
 )
 QwenImageDiffsynthControlnetStub = _stub_factory(
     "QwenImageDiffsynthControlnet", "comfy_extras.nodes_model_patch",
-    "QwenImageDiffsynthControlnet: routes into a PyTorch model layer not yet ported to MLX (P5); "
-    "use the Fusion* equivalent or wait for the comfy/ core fork.",
+    "QwenImageDiffsynthControlnet: controlnet conditioning surface not exposed on the fusion-mlx "
+    "engine (upstream issue #653); use the Fusion* equivalent or wait for the upstream surface.",
 )

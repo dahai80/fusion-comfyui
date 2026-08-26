@@ -73,3 +73,53 @@ class TestLoadImageMask:
         ):
             inputs = LoadImageMask.INPUT_TYPES()
             assert "channel" in inputs["required"]
+
+
+class TestPainterNode:
+    def test_input_types(self):
+        from nodes.image_transform import PainterNode
+        inputs = PainterNode.INPUT_TYPES()
+        assert "mask" in inputs["required"]
+        assert "width" in inputs["required"]
+        assert "height" in inputs["required"]
+        assert "bg_color" in inputs["required"]
+        assert "image" in inputs.get("optional", {})
+        assert PainterNode.RETURN_TYPES == ("IMAGE", "MASK")
+
+    def test_blank_canvas_color(self):
+        from nodes.image_transform import PainterNode
+        img, mask = PainterNode().paint("", 64, 48, "#ff0000")
+        assert img.shape == (1, 48, 64, 3)
+        assert img.dtype == np.float32
+        assert mask.shape == (1, 48, 64)
+        assert mask.dtype == np.float32
+        assert np.allclose(img[0, 0, 0], [1.0, 0.0, 0.0]), "bg_color #ff0000 -> red canvas"
+        assert np.all(mask == 0.0), "no mask file -> all-zero mask"
+
+    def test_blank_canvas_uses_optional_image_dims(self):
+        from nodes.image_transform import PainterNode
+        src = _img(1, 20, 30, 3)
+        img, mask = PainterNode().paint("", 64, 64, "#000000", image=src)
+        assert img.shape == (1, 20, 30, 3), "dims come from optional image, not width/height"
+
+    def test_composite_alpha_and_mask(self, tmp_path):
+        from PIL import Image
+        from nodes.image_transform import PainterNode
+        painter_img = Image.new("RGBA", (8, 8), (10, 20, 30, 255))
+        mask_path = str(tmp_path / "paint.png")
+        painter_img.save(mask_path)
+        with __import__("unittest.mock").mock.patch(
+            "folder_paths.get_annotated_filepath", return_value=mask_path
+        ):
+            img, mask = PainterNode().paint("paint.png", 8, 8, "#000000")
+        assert img.shape == (1, 8, 8, 3)
+        assert mask.shape == (1, 8, 8)
+        assert np.allclose(img[0, 0, 0], [10 / 255.0, 20 / 255.0, 30 / 255.0]), "fully opaque paint overwrites bg"
+        assert np.all(mask == 1.0), "opaque alpha channel -> all-one mask"
+
+    def test_no_torch_import(self):
+        import sys
+        before = set(sys.modules)
+        from nodes.image_transform import PainterNode  # noqa: F401
+        leaked = [m for m in ("torch",) if m in sys.modules and m not in before]
+        assert not leaked, "PainterNode import leaked torch: {}".format(leaked)

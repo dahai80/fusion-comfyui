@@ -391,3 +391,11 @@ class TestFusionIPAdapterInject:
 
     def test_category(self):
         assert FusionIPAdapterInject.CATEGORY == "Fusion-MLX/IP-Adapter"
+
+
+def test_load_ip_adapter_bin_returns_none(tmp_path):
+    from nodes.ip_adapter import _load_ip_adapter_file
+    bin_file = tmp_path / "ip-adapter.bin"
+    bin_file.write_bytes(b"not real safetensors")
+    out = _load_ip_adapter_file(bin_file)
+    assert out is None

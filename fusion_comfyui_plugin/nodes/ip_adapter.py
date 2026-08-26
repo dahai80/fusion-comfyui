@@ -393,16 +393,14 @@ def _preprocess_siglip_image(image_np):
 
 
 def _load_ip_adapter_file(ip_path):
-    """Load IP-Adapter weights from safetensors or PyTorch .bin file.
-
-    Handles two weight formats:
-    1. Safetensors with remapped keys (ip_adapter.double_blocks.N / single_blocks.N)
-    2. PyTorch .bin with flat numeric keys (ip_adapter.N) — auto-remapped
-    """
     if ip_path.is_file():
         ext = ip_path.suffix.lower()
         if ext in (".bin", ".pt", ".ckpt"):
-            return _load_torch_ip_adapter(ip_path)
+            logger.warning(
+                "IP-Adapter %s uses .bin which needs torch; download the .safetensors "
+                "from HF mirror https://hf-mirror.com (same model repo)", ip_path,
+            )
+            return None
         try:
             return mx.load(str(ip_path))
         except Exception as e:
@@ -413,63 +411,21 @@ def _load_ip_adapter_file(ip_path):
         if not safetensors:
             bins = sorted(glob.glob(str(ip_path / "*.bin")))
             if bins:
-                return _load_torch_ip_adapter(Path(bins[0]))
-            logger.warning("IP-Adapter weights not found at %s", ip_path)
+                logger.warning(
+                    "IP-Adapter dir %s has only .bin (needs torch); download .safetensors "
+                    "from https://hf-mirror.com", ip_path,
+                )
+            else:
+                logger.warning("IP-Adapter weights not found at %s", ip_path)
             return None
         raw = {}
         for sf in safetensors:
             raw.update(mx.load(sf))
+        logger.info("Loaded %d IP-Adapter tensors from %d safetensors", len(raw), len(safetensors))
         return raw
     else:
         logger.warning("IP-Adapter path not found: %s", ip_path)
         return None
-
-
-def _load_torch_ip_adapter(path):
-    """Load PyTorch IP-Adapter .bin file, flatten and remap keys to MLX format."""
-    try:
-        import torch
-    except ImportError:
-        logger.error("Cannot load .bin IP-Adapter: torch not installed")
-        return None
-
-    logger.info("Loading PyTorch IP-Adapter from %s", path)
-    ckpt = torch.load(str(path), map_location="cpu", weights_only=True)
-
-    if not isinstance(ckpt, dict):
-        logger.error("Unexpected IP-Adapter format in %s", path)
-        return None
-
-    flat = {}
-    for top_key, subdict in ckpt.items():
-        if isinstance(subdict, dict):
-            for k, v in subdict.items():
-                flat[f"{top_key}.{k}"] = v.detach().cpu().float().numpy()
-        elif hasattr(subdict, "detach"):
-            flat[top_key] = subdict.detach().cpu().float().numpy()
-
-    remapped = {}
-    for k, v in flat.items():
-        if k.startswith("ip_adapter."):
-            rest = k[len("ip_adapter."):]
-            parts = rest.split(".", 1)
-            try:
-                idx = int(parts[0])
-            except ValueError:
-                remapped[k] = mx.array(v)
-                continue
-            suffix = parts[1]
-            num_double = FluxIPAdapterPipeline._NUM_DOUBLE_BLOCKS
-            if idx < num_double:
-                new_key = f"ip_adapter.double_blocks.{idx}.{suffix}"
-            else:
-                new_key = f"ip_adapter.single_blocks.{idx - num_double}.{suffix}"
-            remapped[new_key] = mx.array(v)
-        else:
-            remapped[k] = mx.array(v)
-
-    logger.info("Loaded %d params from PyTorch IP-Adapter, remapped keys", len(remapped))
-    return remapped
 
 
 class FluxIPAdapterPipeline:

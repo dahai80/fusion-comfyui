@@ -46,6 +46,21 @@ class TestCommonUpscale:
         out = common_upscale(_img(1, 3, 64, 32), 32, 32, "bilinear", "center")
         assert out.shape == (1, 3, 32, 32)
 
+    def test_center_crop_symmetric(self):
+        from nodes._scaling import common_upscale
+        # 64x32 input, crop center to 32x32. Correct crop keeps rows [16:48] (centered).
+        # Use a vertical gradient so the cropped mean differs from the buggy asymmetric crop.
+        src = np.zeros((1, 1, 64, 32), dtype=np.float32)
+        src[0, 0, :, 0] = np.linspace(0, 1, 64, dtype=np.float32)  # row gradient
+        out = common_upscale(src, 32, 32, "bilinear", "center")
+        assert out.shape == (1, 1, 32, 32)
+        # correct center crop keeps rows 16..48; gradient there ~ 0.25..0.75, mean ~0.5.
+        # _resize_pil quantizes to uint8, so compare against the quantized gradient mean
+        # (the buggy [16:32] crop mean is ~0.371, far below this — still rejected).
+        grad_q = np.clip(np.linspace(0, 1, 64, dtype=np.float32) * 255.0, 0, 255).astype(np.uint8).astype(np.float32) / 255.0
+        correct_mean = grad_q[16:48].mean()
+        assert abs(out[0, 0, :, 0].mean() - correct_mean) < 1e-4
+
     def test_5d_video(self):
         from nodes._scaling import common_upscale
         src = _img(1, 4, 32, 32)[:, :, None, :, :]  # B,C,T,H,W = (1,4,1,32,32)

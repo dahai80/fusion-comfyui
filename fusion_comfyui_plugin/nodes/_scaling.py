@@ -132,7 +132,7 @@ def common_upscale(samples, width, height, upscale_method, crop):
             x = round((old_w - old_w * (new_aspect / old_aspect)) / 2)
         elif old_aspect < new_aspect:
             y = round((old_h - old_h * (old_aspect / new_aspect)) / 2)
-        samples = samples[:, :, y:old_h - y * 2, x:old_w - x * 2]
+        samples = samples[:, :, y:y + old_h - y * 2, x:x + old_w - x * 2]
 
     if upscale_method == "bislerp":
         out = bislerp(samples, width, height)

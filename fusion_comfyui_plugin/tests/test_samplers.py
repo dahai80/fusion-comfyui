@@ -582,19 +582,23 @@ class TestLatentUpscaleOverride:
         assert result[0]["samples"].max() <= 1.0
 
     def test_true_latent_path_defers_to_native(self):
-        import sys
-        import types
         from nodes.samplers import LatentUpscale
         latent = np.zeros((1, 4, 64, 64), dtype=np.float32)
         samples = {"samples": latent}
         node = LatentUpscale()
         fake_common_upscale = MagicMock(return_value=latent)
-        fake_utils = types.ModuleType("comfy.utils")
-        fake_utils.common_upscale = fake_common_upscale
-        fake_comfy = types.ModuleType("comfy")
-        fake_comfy.utils = fake_utils
-        with patch.dict(sys.modules, {"comfy": fake_comfy, "comfy.utils": fake_utils}):
+        with patch("nodes._scaling.common_upscale", fake_common_upscale):
             node.upscale(samples, "bicubic", 512, 512, "disabled")
         assert fake_common_upscale.called
         args = fake_common_upscale.call_args[0]
         assert args[1] == 64 and args[2] == 64
+
+
+def test_latent_upscale_true_latent_numpy():
+    from nodes.samplers import LatentUpscale
+    latent = {
+        "samples": np.random.default_rng(3).random((1, 1, 4, 16, 16)).astype(np.float32),
+    }
+    out = LatentUpscale().upscale(latent, "bilinear", 128, 128, "disabled")
+    assert out[0]["samples"].shape == (1, 1, 4, 16, 16)
+    assert isinstance(out[0]["samples"], np.ndarray)

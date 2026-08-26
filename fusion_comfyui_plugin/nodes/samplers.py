@@ -614,7 +614,7 @@ class LatentUpscale:
             )
             return (s,)
         # True latent path: mirror native behavior (latent space, /8).
-        import comfy.utils
+        from nodes._scaling import common_upscale
 
         if width == 0 and height == 0:
             return (s,)
@@ -627,8 +627,10 @@ class LatentUpscale:
         else:
             width = max(64, width)
             height = max(64, height)
-        s["samples"] = comfy.utils.common_upscale(
-            arr, width // 8, height // 8, upscale_method, crop
+        latent_np = np.asarray(arr)
+        s["samples"] = common_upscale(
+            latent_np, width // 8, height // 8, upscale_method, crop
         )
+        logger.info("LatentUpscale: latent path -> %dx%d", width, height)
         return (s,)
 

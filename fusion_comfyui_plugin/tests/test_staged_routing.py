@@ -46,3 +46,58 @@ def test_should_use_staged_unknown_type():
     from nodes.samplers import _should_use_staged
     model = _model("audio")  # neither video nor image
     assert _should_use_staged(model, {"prompt": "p"}, None, _latent(), 1.0) is False
+
+
+def test_staged_pixels_video_mx_array():
+    import mlx.core as mx
+    from nodes.samplers import _staged_pixels_to_numpy
+    # VAE decode returns float [0,1]; THWC
+    pixels = mx.array(np.random.rand(4, 512, 768, 3).astype(np.float32))
+    out = _staged_pixels_to_numpy(pixels, "video")
+    assert isinstance(out, np.ndarray)
+    assert out.dtype == np.float32
+    assert out.shape == (4, 512, 768, 3)
+    assert out.min() >= 0.0 and out.max() <= 1.0
+
+
+def test_staged_pixels_video_ndim5_squeezes():
+    import mlx.core as mx
+    from nodes.samplers import _staged_pixels_to_numpy
+    pixels = mx.array(np.random.rand(1, 4, 512, 768, 3).astype(np.float32))
+    out = _staged_pixels_to_numpy(pixels, "video")
+    assert out.shape == (4, 512, 768, 3)
+
+
+def test_staged_pixels_image_nchw_to_hwc():
+    import mlx.core as mx
+    from nodes.samplers import _staged_pixels_to_numpy
+    # Image decode returns [batch,c,h,w]
+    pixels = mx.array(np.random.rand(1, 3, 512, 512).astype(np.float32))
+    out = _staged_pixels_to_numpy(pixels, "image")
+    assert out.shape == (512, 512, 3)
+    assert out.dtype == np.float32
+
+
+def test_staged_pixels_image_4ch_slices_to_3():
+    import mlx.core as mx
+    from nodes.samplers import _staged_pixels_to_numpy
+    pixels = mx.array(np.random.rand(1, 4, 64, 64).astype(np.float32))
+    out = _staged_pixels_to_numpy(pixels, "image")
+    assert out.shape == (64, 64, 3)
+
+
+def test_staged_pixels_clamps_out_of_range():
+    import mlx.core as mx
+    from nodes.samplers import _staged_pixels_to_numpy
+    pixels = mx.array(np.full((2, 8, 8, 3), 2.0, dtype=np.float32))
+    out = _staged_pixels_to_numpy(pixels, "video")
+    assert out.max() <= 1.0
+
+
+def test_staged_pixels_uint8_fallback_divides():
+    from nodes.samplers import _staged_pixels_to_numpy
+    # Defensive: if decode ever returns uint8 numpy, divide like monolith
+    pixels = np.full((2, 8, 8, 3), 255, dtype=np.uint8)
+    out = _staged_pixels_to_numpy(pixels, "video")
+    assert out.dtype == np.float32
+    assert out.max() <= 1.0

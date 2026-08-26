@@ -90,6 +90,44 @@ def _should_use_staged(model_wrapper, positive, negative, latent_image, denoise)
     return False
 
 
+def _staged_pixels_to_numpy(pixels, model_type):
+    # Staged decode returns mx.array float [0,1] (NOT uint8 like monolith raw).
+    # Normalize to the same numpy contract the monolith produces:
+    #   video -> [T,H,W,3] float32 [0,1]
+    #   image -> [H,W,3] float32 [0,1]
+    if isinstance(pixels, mx.array):
+        mx.eval(pixels)
+        arr = np.array(pixels)
+    else:
+        arr = np.asarray(pixels)
+    is_uint8 = arr.dtype != np.float32 and np.issubdtype(arr.dtype, np.integer)
+    if is_uint8:
+        arr = arr.astype(np.float32) / 255.0
+    else:
+        arr = arr.astype(np.float32)
+    arr = np.clip(arr, 0.0, 1.0)
+    if model_type == "video":
+        while arr.ndim > 4 and arr.shape[0] == 1:
+            arr = arr[0]
+        if arr.ndim == 5:
+            arr = arr[0]
+        logger.info("_staged_pixels_to_numpy: video out shape=%s", arr.shape)
+        return arr
+    # image: decode is [batch,c,h,w] -> [H,W,3]
+    if arr.ndim == 4:
+        if arr.shape[1] == 4:
+            arr = arr[:, :3]
+        arr = np.transpose(arr, (0, 2, 3, 1))
+        if arr.shape[0] == 1:
+            arr = arr[0]
+    elif arr.ndim == 3 and arr.shape[0] in (3, 4):
+        if arr.shape[0] == 4:
+            arr = arr[:3]
+        arr = np.transpose(arr, (1, 2, 0))
+    logger.info("_staged_pixels_to_numpy: image out shape=%s", arr.shape)
+    return arr
+
+
 async def _generate_monolithic(model_wrapper, positive, negative, latent_image,
                                steps, cfg, seed, width, height, num_frames, denoise=1.0,
                                sampler_name="euler"):

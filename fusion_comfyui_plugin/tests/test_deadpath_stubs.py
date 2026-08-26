@@ -2,13 +2,12 @@ import pytest
 
 
 STUBS = [
-    ("ConditioningSetMaskStub", "regional-mask conditioning is not supported"),
-    ("VAEEncodeForInpaintStub", "PyTorch model layer"),
-    ("InpaintModelConditioningStub", "PyTorch model layer"),
-    ("ControlNetApplyStub", "PyTorch model layer"),
-    ("ControlNetApplyAdvancedStub", "PyTorch model layer"),
-    ("PainterNodeStub", "PyTorch model layer"),
-    ("QwenImageDiffsynthControlnetStub", "PyTorch model layer"),
+    ("ConditioningSetMaskStub", "upstream issue #653"),
+    ("VAEEncodeForInpaintStub", "upstream issue #653"),
+    ("InpaintModelConditioningStub", "upstream issue #653"),
+    ("ControlNetApplyStub", "upstream issue #653"),
+    ("ControlNetApplyAdvancedStub", "upstream issue #653"),
+    ("QwenImageDiffsynthControlnetStub", "upstream issue #653"),
 ]
 
 

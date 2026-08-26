@@ -186,3 +186,93 @@ class LoadImageMask:
         if not folder_paths.exists_annotated_filepath(image):
             return "Invalid image file: {}".format(image)
         return True
+
+
+def _hex_to_rgb(hex_color: str) -> tuple[float, float, float]:
+    hex_color = hex_color.lstrip("#")
+    if len(hex_color) != 6:
+        return (0.0, 0.0, 0.0)
+    r = int(hex_color[0:2], 16) / 255.0
+    g = int(hex_color[2:4], 16) / 255.0
+    b = int(hex_color[4:6], 16) / 255.0
+    return (r, g, b)
+
+
+class PainterNode:
+    # P5: ported from comfy_extras/nodes_painter.py to numpy (torch-free).
+    # Pure image compositing — bg canvas + RGBA paint alpha-over + alpha mask.
+    # IMAGE/MASK are numpy NHWC float32 [0,1] per the P2 contract.
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "mask": ("STRING", {"default": "", "widgetType": "PAINTER", "image_upload": True}),
+                "width": ("INT", {"default": 512, "min": 64, "max": 4096, "step": 64}),
+                "height": ("INT", {"default": 512, "min": 64, "max": 4096, "step": 64}),
+                "bg_color": ("COLOR", {"default": "#000000"}),
+            },
+            "optional": {"image": ("IMAGE",)},
+        }
+
+    CATEGORY = "image"
+    RETURN_TYPES = ("IMAGE", "MASK")
+    FUNCTION = "paint"
+    OUTPUT_NODE = False
+
+    def paint(self, mask, width, height, bg_color="#000000", image=None):
+        if image is not None:
+            base_image = np.asarray(image)[:1]
+            h, w = int(base_image.shape[1]), int(base_image.shape[2])
+        else:
+            h, w = int(height), int(width)
+            r, g, b = _hex_to_rgb(bg_color)
+            base_image = np.zeros((1, h, w, 3), dtype=np.float32)
+            base_image[0, :, :, 0] = r
+            base_image[0, :, :, 1] = g
+            base_image[0, :, :, 2] = b
+
+        if mask and mask.strip():
+            import folder_paths
+            from PIL import Image
+            mask_path = folder_paths.get_annotated_filepath(mask)
+            try:
+                import node_helpers
+                painter_img = node_helpers.pillow(Image.open, mask_path)
+            except ImportError:
+                painter_img = Image.open(mask_path)
+            painter_img = painter_img.convert("RGBA")
+
+            if painter_img.size != (w, h):
+                painter_img = painter_img.resize((w, h), Image.LANCZOS)
+
+            painter_np = np.array(painter_img).astype(np.float32) / 255.0
+            painter_rgb = painter_np[:, :, :3]
+            painter_alpha = painter_np[:, :, 3:4]
+
+            mask_arr = painter_np[:, :, 3][np.newaxis, ...].astype(np.float32)
+
+            base_np = np.asarray(base_image[0])
+            composited = painter_rgb * painter_alpha + base_np * (1.0 - painter_alpha)
+            out_image = np.ascontiguousarray(composited[np.newaxis, ...].astype(np.float32))
+            logger.info("PainterNode: composited paint=%s -> img %s mask %s", mask, out_image.shape, mask_arr.shape)
+        else:
+            mask_arr = np.zeros((1, h, w), dtype=np.float32)
+            out_image = np.ascontiguousarray(base_image.astype(np.float32))
+            logger.info("PainterNode: blank canvas %s, zero mask %s", out_image.shape, mask_arr.shape)
+
+        return (out_image, mask_arr)
+
+    @classmethod
+    def IS_CHANGED(s, mask, width, height, bg_color="#000000", image=None):
+        import hashlib
+        import os
+        import folder_paths
+        if mask and mask.strip():
+            mask_path = folder_paths.get_annotated_filepath(mask)
+            if os.path.exists(mask_path):
+                m = hashlib.sha256()
+                with open(mask_path, "rb") as f:
+                    m.update(f.read())
+                return m.digest().hex()
+        return ""

@@ -48,6 +48,7 @@ from .nodes.image_transform import (
     EmptyImage as _EmptyImage,
     ImagePadForOutpaint as _ImagePadForOutpaint,
     LoadImageMask as _LoadImageMask,
+    PainterNode,
 )
 from .nodes._deadpath_stubs import (
     ConditioningSetMaskStub,
@@ -55,7 +56,6 @@ from .nodes._deadpath_stubs import (
     InpaintModelConditioningStub,
     ControlNetApplyStub,
     ControlNetApplyAdvancedStub,
-    PainterNodeStub,
     QwenImageDiffsynthControlnetStub,
 )
 from .nodes.samplers import (
@@ -166,7 +166,7 @@ NODE_CLASS_MAPPINGS = {
     "InpaintModelConditioning": InpaintModelConditioningStub,
     "ControlNetApply": ControlNetApplyStub,
     "ControlNetApplyAdvanced": ControlNetApplyAdvancedStub,
-    "PainterNode": PainterNodeStub,
+    "PainterNode": PainterNode,
     "QwenImageDiffsynthControlnet": QwenImageDiffsynthControlnetStub,
     # Conditioning
     "CLIPTextEncode": CLIPTextEncode,
@@ -276,7 +276,7 @@ _native_overrides = {
     "InpaintModelConditioning": InpaintModelConditioningStub,
     "ControlNetApply": ControlNetApplyStub,
     "ControlNetApplyAdvanced": ControlNetApplyAdvancedStub,
-    "PainterNode": PainterNodeStub,
+    "PainterNode": PainterNode,
     "QwenImageDiffsynthControlnet": QwenImageDiffsynthControlnetStub,
     "CLIPTextEncode": CLIPTextEncode,
     "KSampler": KSampler,

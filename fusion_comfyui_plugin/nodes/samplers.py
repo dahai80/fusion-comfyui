@@ -54,6 +54,79 @@ def _upscale_init_image(src_path: str, width: int, height: int) -> str:
     return path
 
 
+def _should_use_staged(model_wrapper, positive, negative, latent_image, denoise):
+    # Auto-detect: route to staged API only for video T2V (no i2v/vace inputs)
+    # and image txt2img (no cascade prior, not img2img denoise<1). Everything
+    # else (I2V, VACE, cascade stage_b, img2img) falls back to monolith.
+    model_type = getattr(model_wrapper, "model_type", None)
+    has_i2v = bool(latent_image.get("_i2v_image_path"))
+    has_vace = bool(
+        latent_image.get("_vace_control_video")
+        or latent_image.get("_vace_control_mask")
+        or latent_image.get("_vace_reference_images")
+    )
+    has_init = bool(latent_image.get("_image_init_path"))
+    has_cascade_prior = False
+    for cond in (positive, negative):
+        if isinstance(cond, dict) and cond.get("stable_cascade_prior") is not None:
+            has_cascade_prior = True
+            break
+    if model_type == "video":
+        if has_i2v or has_vace:
+            logger.info("_should_use_staged: video monolith (i2v=%s vace=%s)", has_i2v, has_vace)
+            return False
+        logger.info("_should_use_staged: video T2V -> staged")
+        return True
+    if model_type == "image":
+        if has_cascade_prior:
+            logger.info("_should_use_staged: image cascade stage_b -> pass-through (monolith)")
+            return False
+        if has_init and denoise is not None and denoise < 1.0:
+            logger.info("_should_use_staged: image img2img denoise=%.2f -> monolith", denoise)
+            return False
+        logger.info("_should_use_staged: image txt2img -> staged")
+        return True
+    logger.info("_should_use_staged: unknown model_type=%s -> monolith", model_type)
+    return False
+
+
+def _staged_pixels_to_numpy(pixels, model_type):
+    # Staged decode returns mx.array float [0,1] (NOT uint8 like monolith raw).
+    # Normalize to the same numpy contract the monolith produces:
+    #   video -> [T,H,W,3] float32 [0,1]
+    #   image -> [H,W,3] float32 [0,1]
+    if isinstance(pixels, mx.array):
+        mx.eval(pixels)
+        arr = np.array(pixels)
+    else:
+        arr = np.asarray(pixels)
+    is_uint8 = arr.dtype != np.float32 and np.issubdtype(arr.dtype, np.integer)
+    if is_uint8:
+        arr = arr.astype(np.float32) / 255.0
+    else:
+        arr = arr.astype(np.float32)
+    arr = np.clip(arr, 0.0, 1.0)
+    if model_type == "video":
+        while arr.ndim > 4 and arr.shape[0] == 1:
+            arr = arr[0]
+        if arr.ndim == 5:
+            arr = arr[0]
+        logger.info("_staged_pixels_to_numpy: video out shape=%s", arr.shape)
+        return arr
+    # image: decode is [batch,c,h,w] -> [H,W,3]
+    if arr.ndim == 4:
+        if arr.shape[1] == 4:
+            arr = arr[:, :3]
+        arr = np.transpose(arr, (0, 2, 3, 1))
+        if arr.shape[0] == 1:
+            arr = arr[0]
+    elif arr.ndim == 3 and arr.shape[0] in (3, 4):
+        if arr.shape[0] == 4:
+            arr = arr[:3]
+        arr = np.transpose(arr, (1, 2, 0))
+    logger.info("_staged_pixels_to_numpy: image out shape=%s", arr.shape)
+    return arr
+
 
 async def _generate_monolithic(model_wrapper, positive, negative, latent_image,
                                steps, cfg, seed, width, height, num_frames, denoise=1.0,
@@ -245,6 +318,28 @@ async def _generate_monolithic(model_wrapper, positive, negative, latent_image,
     return latent_image["samples"]
 
 
+async def _generate_staged(model_wrapper, positive, negative, latent_image,
+                           steps, cfg, seed, width, height, num_frames, denoise=1.0,
+                           sampler_name="euler"):
+    engine = model_wrapper.get_engine()
+    await engine.ensure_started()
+    prompt = positive.get("prompt", "")
+    neg_prompt = negative.get("prompt", "") if negative else ""
+    mlx_latent = latent_image["samples"]
+    if not isinstance(mlx_latent, mx.array):
+        from fusion_comfyui.core.bridge import to_mlx_array
+        mlx_latent = to_mlx_array(mlx_latent)
+    logger.info(
+        "_generate_staged: model=%s steps=%d cfg=%.1f seed=%d frames=%d %dx%d",
+        model_wrapper.model_name, steps, cfg, seed, num_frames, width, height,
+    )
+    pixels = await engine._run_staged_pipeline(
+        mlx_latent, prompt=prompt, neg_prompt=neg_prompt,
+        steps=steps, cfg=cfg, seed=seed, num_frames=num_frames,
+    )
+    return _staged_pixels_to_numpy(pixels, model_wrapper.model_type)
+
+
 class KSampler:
     @classmethod
     def INPUT_TYPES(cls):
@@ -313,14 +408,20 @@ class KSampler:
             model.model_name, steps, cfg, seed, num_frames, width, height,
         )
 
-        result = fusion_comfyui.core.async_utils.run_async(
-            _generate_monolithic(
+        if _should_use_staged(model, positive, negative, latent_image, denoise):
+            logger.info("KSampler: staged path selected for %s", model.model_name)
+            generate_coro = _generate_staged(
                 model, positive, negative, latent_image,
                 steps, cfg, seed, width, height, num_frames, denoise=denoise,
                 sampler_name=sampler_name,
-            ),
-            timeout=3600,
-        )
+            )
+        else:
+            generate_coro = _generate_monolithic(
+                model, positive, negative, latent_image,
+                steps, cfg, seed, width, height, num_frames, denoise=denoise,
+                sampler_name=sampler_name,
+            )
+        result = fusion_comfyui.core.async_utils.run_async(generate_coro, timeout=3600)
 
         _i2v_tmp = latent_image.get("_i2v_image_path")
         # Don't delete the temp file here — multi-KSampler workflows (e.g. wan22 14B i2v)

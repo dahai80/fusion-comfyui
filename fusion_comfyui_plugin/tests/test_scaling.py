@@ -35,6 +35,27 @@ class TestBislerp:
         assert np.allclose(out, src, atol=1e-4)
 
 
+class TestSlerp:
+    def test_zero_endpoint_degenerates_to_lerp(self):
+        from nodes._scaling import _slerp
+        b1 = np.zeros((1, 3), dtype=np.float32)
+        b2 = np.array([[1.0, 2.0, 3.0]], dtype=np.float32)
+        r = np.array([[0.5]], dtype=np.float32)
+        out = _slerp(b1, b2, r)
+        # zero-vector endpoint: slerp must degenerate to linear interpolation,
+        # not the arccos(0)=pi/2 distortion (which gives ~0.353*b2 at r=0.5).
+        expected = b1 * (1.0 - 0.5) + b2 * 0.5
+        assert np.allclose(out, expected, atol=1e-6)
+
+    def test_both_zero_endpoint(self):
+        from nodes._scaling import _slerp
+        b1 = np.zeros((1, 3), dtype=np.float32)
+        b2 = np.zeros((1, 3), dtype=np.float32)
+        r = np.array([[0.5]], dtype=np.float32)
+        out = _slerp(b1, b2, r)
+        assert np.allclose(out, 0.0, atol=1e-6)
+
+
 class TestCommonUpscale:
     def test_disabled_crop_grows(self):
         from nodes._scaling import common_upscale

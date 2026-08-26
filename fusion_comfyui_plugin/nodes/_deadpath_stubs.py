@@ -8,7 +8,7 @@ def _stub_factory(native_cls_name, native_module, message):
     try:
         mod = importlib.import_module(native_module)
         native = getattr(mod, native_cls_name)
-    except Exception as e:
+    except (ImportError, AttributeError) as e:
         logger.warning("deadpath stub: native %s not found (%s)", native_cls_name, e)
         native = object
 
@@ -18,6 +18,7 @@ def _stub_factory(native_cls_name, native_module, message):
     _Stub.FUNCTION = "stub_run"
 
     def stub_run(self, *args, **kwargs):
+        logger.warning("deadpath stub %s invoked (upstream issue #653); raising", native_cls_name)
         raise NotImplementedError(message)
 
     _Stub.stub_run = stub_run

@@ -23,7 +23,7 @@ class ImageScale:
     def upscale(self, image, upscale_method, width, height, crop):
         if width == 0 and height == 0:
             logger.debug("ImageScale: passthrough %s", image.shape)
-            return (image,)
+            return (image.copy(),)
         samples = np.transpose(image, (0, 3, 1, 2))
         if width == 0:
             width = max(1, round(samples.shape[3] * height / samples.shape[2]))

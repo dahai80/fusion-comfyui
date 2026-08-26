@@ -46,8 +46,12 @@ def _slerp(b1, b2, r):
     res = res * (b1_norms * (1.0 - r_flat) + b2_norms * r_flat)
     same = dot > 1 - 1e-5
     polar = dot < 1e-5 - 1
+    # zero-norm endpoint has no meaningful direction -> degenerate to lerp,
+    # otherwise arccos(0)=pi/2 silently distorts the mid-range interpolation.
+    degenerate = (b1_norms == 0) | (b2_norms == 0)
     res = np.where(same, b1, res)
     res = np.where(polar, b1 * (1.0 - r_flat) + b2 * r_flat, res)
+    res = np.where(degenerate, b1 * (1.0 - r_flat) + b2 * r_flat, res)
     return res
 
 
@@ -116,6 +120,8 @@ def _resize_pil(samples, width, height, mode):
 def common_upscale(samples, width, height, upscale_method, crop):
     orig_shape = tuple(samples.shape)
     if len(orig_shape) > 4:
+        # 5D input layout is B,C,T,H,W (video latents); flatten T into the
+        # batch axis for the per-frame upscale, then restore the time dim.
         samples = samples.reshape(
             samples.shape[0], samples.shape[1], -1, samples.shape[-2], samples.shape[-1]
         )

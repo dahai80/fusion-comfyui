@@ -19,6 +19,16 @@ class TestImageScale:
         src = _img(1, 32, 32)
         out = ImageScale().upscale(src, "bilinear", 0, 0, "disabled")
         assert out[0].shape == src.shape
+        assert out[0] is not src, "passthrough must copy, not alias the input buffer"
+
+    def test_upscale_preserves_constant(self):
+        from nodes.image_transform import ImageScale
+        src = np.full((1, 16, 16, 3), 0.5, dtype=np.float32)
+        out = ImageScale().upscale(src, "bilinear", 32, 32, "disabled")
+        assert out[0].shape == (1, 32, 32, 3)
+        # _resize_pil quantizes to uint8 (0.5 -> 127/255); a constant must stay
+        # uniform after upscale -- a value-scrambling bug breaks uniformity.
+        assert np.allclose(out[0], out[0][0, 0, 0], atol=1e-6)
 
 
 class TestImageScaleBy:
@@ -63,6 +73,21 @@ class TestImagePadForOutpaint:
         img, mask = ImagePadForOutpaint().expand_image(src, 4, 4, 4, 4, 0)
         assert img.shape == (1, 24, 24, 3)
         assert mask.shape == (1, 24, 24)
+
+    def test_feathering_blends_mask_border(self):
+        from nodes.image_transform import ImagePadForOutpaint
+        src = _img(1, 32, 32, 3)
+        img, mask = ImagePadForOutpaint().expand_image(src, 8, 8, 8, 8, 10)
+        assert mask.shape == (1, 48, 48)
+        inner = mask[0, 8:40, 8:40]
+        # feathering>0 with a real border produces a non-trivial blend: the
+        # mask interior is not all-zero (no feather) nor all-one (no border),
+        # and the center (far from all borders) stays zero.
+        assert inner.max() > 0.0, "feathering must produce non-zero mask near borders"
+        assert inner[16, 16] == 0.0, "mask center (d >= feathering from every edge) stays zero"
+        # feather value peaks at the image edge (d=0 -> v=1) and ramps to 0
+        # inward; the edge row is strictly greater than the row one step in.
+        assert inner[0, 16] > inner[1, 16]
 
 
 class TestLoadImageMask:

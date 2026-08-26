@@ -6,6 +6,7 @@ import mlx.core as mx
 
 from fusion_comfyui.core.config import load_config, RadixCache
 from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
+from fusion_comfyui.core.stage_context import StageContext
 from fusion_comfyui.core.timer import NodeTimer
 
 logger = logging.getLogger("fusion_comfyui.core.engine_wrapper")
@@ -289,35 +290,37 @@ class FusionEngineWrapper:
     async def _run_staged_pipeline(self, latent, prompt, neg_prompt, steps, cfg, seed, num_frames=None):
         # Staged: text-encode -> denoise -> vae-decode, strict offload between.
         # Returns decoded pixels mx.array (float [0,1]); caller normalizes to numpy.
-        logger.info("_run_staged_pipeline: start type=%s steps=%d cfg=%.1f seed=%d", self.model_type, steps, cfg, seed)
+        # StageContext carries the data flowing between stages (pos/neg cond, latent, pixels).
+        ctx = StageContext(model_wrapper=self, latent=latent, model_type=self.model_type)
+        logger.info("_run_staged_pipeline: start type=%s steps=%d cfg=%.1f seed=%d", ctx.model_type, steps, cfg, seed)
         await self.load_text_encoder()
         try:
-            pos_cond = await self.encode_text(prompt)
-            neg_cond = await self.encode_text(neg_prompt) if (cfg > 1.0 and neg_prompt) else None
+            ctx.pos_cond = await self.encode_text(prompt)
+            ctx.neg_cond = await self.encode_text(neg_prompt) if (cfg > 1.0 and neg_prompt) else None
         finally:
             await self.unload_text_encoder()
         FusionMemoryGuardian.purge_memory()
-        logger.info("_run_staged_pipeline: text stage done, pos+neg encoded=%s", neg_cond is not None)
+        logger.info("_run_staged_pipeline: text stage done, pos+neg encoded=%s", ctx.neg_cond is not None)
 
         await self.load_dit()
         try:
-            if self.model_type == "video":
-                latent = await self.denoise(latent, pos_cond, neg_cond, steps=steps, cfg=cfg, seed=seed, num_frames=num_frames)
+            if ctx.model_type == "video":
+                ctx.latent = await self.denoise(ctx.latent, ctx.pos_cond, ctx.neg_cond, steps=steps, cfg=cfg, seed=seed, num_frames=num_frames)
             else:
-                latent = await self.denoise(latent, pos_cond, neg_cond, steps=steps, cfg=cfg, seed=seed)
+                ctx.latent = await self.denoise(ctx.latent, ctx.pos_cond, ctx.neg_cond, steps=steps, cfg=cfg, seed=seed)
         finally:
             await self.unload_dit()
         FusionMemoryGuardian.purge_memory()
-        logger.info("_run_staged_pipeline: denoise stage done, latent shape=%s", tuple(latent.shape))
+        logger.info("_run_staged_pipeline: denoise stage done, latent shape=%s", tuple(ctx.latent.shape))
 
         await self.load_vae()
         try:
-            pixels = await self.decode(latent)
+            ctx.pixels = await self.decode(ctx.latent)
         finally:
             await self.unload_vae()
         FusionMemoryGuardian.purge_memory()
-        logger.info("_run_staged_pipeline: vae stage done, pixels shape=%s", tuple(pixels.shape))
-        return pixels
+        logger.info("_run_staged_pipeline: vae stage done, pixels shape=%s", tuple(ctx.pixels.shape))
+        return ctx.pixels
 
     async def generate_i2v(self, prompt: str, image_path: str, num_frames: int = 49, seed: int = 0, **kwargs):
         async with NodeTimer.timed(self.model_name, "generate_i2v", frames=num_frames, seed=seed):
@@ -488,10 +491,6 @@ class FusionEngineWrapper:
         logger.info("unload_stage: %s", stage_name)
         gc.collect()
         _safe_clear_cache()
-
-    def stage(self, stage_name: str):
-        from .lifecycle import PipelineStageContext
-        return PipelineStageContext(self, stage_name)
 
     # ── PuLID lifecycle ──────────────────────────────────────
 

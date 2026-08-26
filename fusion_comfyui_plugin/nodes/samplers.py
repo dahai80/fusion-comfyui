@@ -54,6 +54,41 @@ def _upscale_init_image(src_path: str, width: int, height: int) -> str:
     return path
 
 
+def _should_use_staged(model_wrapper, positive, negative, latent_image, denoise):
+    # Auto-detect: route to staged API only for video T2V (no i2v/vace inputs)
+    # and image txt2img (no cascade prior, not img2img denoise<1). Everything
+    # else (I2V, VACE, cascade stage_b, img2img) falls back to monolith.
+    model_type = getattr(model_wrapper, "model_type", None)
+    has_i2v = bool(latent_image.get("_i2v_image_path"))
+    has_vace = bool(
+        latent_image.get("_vace_control_video")
+        or latent_image.get("_vace_control_mask")
+        or latent_image.get("_vace_reference_images")
+    )
+    has_init = bool(latent_image.get("_image_init_path"))
+    has_cascade_prior = False
+    for cond in (positive, negative):
+        if isinstance(cond, dict) and cond.get("stable_cascade_prior") is not None:
+            has_cascade_prior = True
+            break
+    if model_type == "video":
+        if has_i2v or has_vace:
+            logger.info("_should_use_staged: video monolith (i2v=%s vace=%s)", has_i2v, has_vace)
+            return False
+        logger.info("_should_use_staged: video T2V -> staged")
+        return True
+    if model_type == "image":
+        if has_cascade_prior:
+            logger.info("_should_use_staged: image cascade stage_b -> pass-through (monolith)")
+            return False
+        if has_init and denoise is not None and denoise < 1.0:
+            logger.info("_should_use_staged: image img2img denoise=%.2f -> monolith", denoise)
+            return False
+        logger.info("_should_use_staged: image txt2img -> staged")
+        return True
+    logger.info("_should_use_staged: unknown model_type=%s -> monolith", model_type)
+    return False
+
 
 async def _generate_monolithic(model_wrapper, positive, negative, latent_image,
                                steps, cfg, seed, width, height, num_frames, denoise=1.0,

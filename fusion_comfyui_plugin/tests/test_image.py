@@ -22,6 +22,12 @@ class TestLoadImage:
             node = LoadImage()
             result = node.load_image("test.png")
             assert result is not None
+            image_t, mask_t = result
+            assert isinstance(image_t, np.ndarray)
+            assert image_t.shape == (1, 64, 64, 3)
+            assert image_t.dtype == np.float32
+            assert isinstance(mask_t, np.ndarray)
+            assert mask_t.ndim == 3
 
 
 class TestSaveImage:

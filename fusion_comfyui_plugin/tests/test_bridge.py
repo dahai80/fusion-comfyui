@@ -142,3 +142,26 @@ class TestToImageArray:
         with patch.object(bridge, "to_numpy", return_value=arr):
             result = bridge.to_image_array(MagicMock())
             assert result.dtype == np.float32
+
+
+def test_to_image_tensor_returns_numpy():
+    from fusion_comfyui.core.bridge import to_image_tensor
+    src = np.random.default_rng(1).random((2, 8, 8, 3)).astype(np.float32)
+    out = to_image_tensor(src)
+    assert isinstance(out, np.ndarray)
+    assert out.dtype == np.float32
+    assert out.shape == (2, 8, 8, 3)
+
+
+def test_to_mask_numpy():
+    from fusion_comfyui.core.bridge import to_mask_numpy
+    src = np.random.default_rng(2).random((4, 8, 8)).astype(np.float32)
+    out = to_mask_numpy(src)
+    assert isinstance(out, np.ndarray)
+    assert out.dtype == np.float32
+    assert out.ndim == 3
+
+
+def test_to_image_numpy_alias():
+    from fusion_comfyui.core.bridge import to_image_numpy, to_image_tensor
+    assert to_image_numpy is to_image_tensor

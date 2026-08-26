@@ -165,3 +165,28 @@ def test_to_mask_numpy():
 def test_to_image_numpy_alias():
     from fusion_comfyui.core.bridge import to_image_numpy, to_image_tensor
     assert to_image_numpy is to_image_tensor
+
+
+def test_to_mask_numpy_squeezes_singleton_channel():
+    from fusion_comfyui.core.bridge import to_mask_numpy
+    src = np.random.default_rng(4).random((2, 8, 8, 1)).astype(np.float32)
+    out = to_mask_numpy(src)
+    assert isinstance(out, np.ndarray)
+    assert out.dtype == np.float32
+    assert out.shape == (2, 8, 8), "4D [B,H,W,1] must squeeze to 3D [B,H,W], got {}".format(out.shape)
+
+
+def test_to_mask_numpy_expands_2d():
+    from fusion_comfyui.core.bridge import to_mask_numpy
+    src = np.random.default_rng(5).random((8, 8)).astype(np.float32)
+    out = to_mask_numpy(src)
+    assert isinstance(out, np.ndarray)
+    assert out.dtype == np.float32
+    assert out.shape == (1, 8, 8), "2D [H,W] must expand to 3D [1,H,W], got {}".format(out.shape)
+
+
+def test_to_mask_numpy_does_not_squeeze_image_channels():
+    from fusion_comfyui.core.bridge import to_mask_numpy
+    src = np.random.default_rng(6).random((2, 8, 8, 3)).astype(np.float32)
+    out = to_mask_numpy(src)
+    assert out.shape == (2, 8, 8, 3), "4D [B,H,W,3] must NOT be squeezed, got {}".format(out.shape)

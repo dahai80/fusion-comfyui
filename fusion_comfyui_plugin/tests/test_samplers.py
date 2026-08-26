@@ -581,7 +581,7 @@ class TestLatentUpscaleOverride:
         result = node.upscale(samples, "bilinear", 64, 64, "disabled")
         assert result[0]["samples"].max() <= 1.0
 
-    def test_true_latent_path_defers_to_native(self):
+    def test_true_latent_path_uses_common_upscale(self):
         from nodes.samplers import LatentUpscale
         latent = np.zeros((1, 4, 64, 64), dtype=np.float32)
         samples = {"samples": latent}

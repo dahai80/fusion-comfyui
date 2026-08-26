@@ -1,6 +1,9 @@
+import asyncio
+
+import mlx.core as mx
 import numpy as np
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 
 def _model(model_type):
@@ -101,3 +104,129 @@ def test_staged_pixels_uint8_fallback_divides():
     out = _staged_pixels_to_numpy(pixels, "video")
     assert out.dtype == np.float32
     assert out.max() <= 1.0
+
+
+def _staged_mock_model(model_type="video"):
+    from fusion_comfyui.core.wrappers import FusionModelWrapper
+    mock = MagicMock(spec=FusionModelWrapper)
+    mock.model_type = model_type
+    mock.model_name = f"staged-{model_type}"
+    engine = MagicMock()
+    engine.ensure_started = AsyncMock()
+    engine._run_staged_pipeline = AsyncMock(
+        return_value=mx.array(np.random.rand(4, 512, 768, 3).astype(np.float32))
+    )
+    mock.get_engine = MagicMock(return_value=engine)
+    return mock
+
+
+def _make_mock_model_monolith(model_type="image"):
+    from fusion_comfyui.core.wrappers import FusionModelWrapper
+    mock = MagicMock(spec=FusionModelWrapper)
+    mock.model_type = model_type
+    mock.model_name = f"mono-{model_type}"
+    engine = MagicMock()
+    engine.ensure_started = AsyncMock()
+    mock.get_engine = MagicMock(return_value=engine)
+    return mock
+
+
+class TestGenerateStaged:
+    def test_video_staged_calls_pipeline(self):
+        from nodes.samplers import _generate_staged
+        model = _staged_mock_model("video")
+        positive = {"prompt": "cat playing"}
+        negative = {"prompt": "blurry"}
+        latent = {
+            "samples": np.zeros((1, 16, 5, 32, 32), dtype=np.float32),
+            "num_frames": 41, "width": 768, "height": 512,
+        }
+        result = asyncio.run(
+            _generate_staged(model, positive, negative, latent, 20, 6.0, 42, 768, 512, 41)
+        )
+        assert isinstance(result, np.ndarray)
+        assert result.ndim >= 3 and result.shape[-1] == 3
+        engine = model.get_engine.return_value
+        engine._run_staged_pipeline.assert_awaited_once()
+        call = engine._run_staged_pipeline.await_args
+        assert call.kwargs["prompt"] == "cat playing"
+        assert call.kwargs["neg_prompt"] == "blurry"
+        assert call.kwargs["num_frames"] == 41
+
+    def test_image_staged_calls_pipeline(self):
+        from nodes.samplers import _generate_staged
+        model = _staged_mock_model("image")
+        model.get_engine.return_value._run_staged_pipeline = AsyncMock(
+            return_value=mx.array(np.random.rand(1, 3, 512, 512).astype(np.float32))
+        )
+        positive = {"prompt": "a cat"}
+        negative = {"prompt": "bad"}
+        latent = {
+            "samples": np.zeros((1, 4, 64, 64), dtype=np.float32),
+            "width": 512, "height": 512,
+        }
+        result = asyncio.run(
+            _generate_staged(model, positive, negative, latent, 20, 6.0, 42, 512, 512, 1)
+        )
+        assert isinstance(result, np.ndarray)
+        assert result.shape == (512, 512, 3)
+
+    def test_staged_negative_none(self):
+        from nodes.samplers import _generate_staged
+        model = _staged_mock_model("video")
+        positive = {"prompt": "cat"}
+        negative = None
+        latent = {
+            "samples": np.zeros((1, 16, 5, 32, 32), dtype=np.float32),
+            "num_frames": 41, "width": 768, "height": 512,
+        }
+        asyncio.run(
+            _generate_staged(model, positive, negative, latent, 20, 6.0, 42, 768, 512, 41)
+        )
+        call = model.get_engine.return_value._run_staged_pipeline.await_args
+        assert call.kwargs["neg_prompt"] == ""
+
+
+class TestSampleDispatch:
+    def test_t2v_routes_to_staged(self):
+        from nodes.samplers import KSampler
+        model = _staged_mock_model("video")
+        positive = {"prompt": "cat"}
+        negative = {"prompt": "bad"}
+        latent = {
+            "samples": np.zeros((1, 16, 5, 64, 64), dtype=np.float32),
+            "num_frames": 41, "width": 768, "height": 512,
+        }
+        node = KSampler()
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"):
+            result = node.sample(model, 42, 20, 6.0, "euler", "normal", positive, negative, latent, denoise=1.0)
+        model.get_engine.return_value._run_staged_pipeline.assert_awaited_once()
+        assert "_decoded_frames_key" in result[0]
+
+    def test_i2v_routes_to_monolith(self):
+        from nodes.samplers import KSampler
+        model = _make_mock_model_monolith("video")
+        positive = {"prompt": "cat"}
+        negative = {"prompt": "bad"}
+        latent = {
+            "samples": np.zeros((1, 16, 5, 64, 64), dtype=np.float32),
+            "_i2v_image_path": "/tmp/x.png",
+        }
+        node = KSampler()
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
+             patch("fusion_comfyui.core.async_utils.run_async", return_value=np.zeros((4, 512, 768, 3), dtype=np.float32)) as ra:
+            node.sample(model, 42, 20, 6.0, "euler", "normal", positive, negative, latent, denoise=1.0)
+        assert ra.called
+
+    def test_cascade_routes_to_monolith(self):
+        from nodes.samplers import KSampler
+        model = _make_mock_model_monolith("image")
+        prior = np.zeros((64, 64, 3), dtype=np.float32)
+        positive = {"prompt": "p", "stable_cascade_prior": prior}
+        negative = {"prompt": "n"}
+        latent = {"samples": np.zeros((1, 4, 64, 64), dtype=np.float32)}
+        node = KSampler()
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
+             patch("fusion_comfyui.core.async_utils.run_async", return_value=prior) as ra:
+            node.sample(model, 42, 20, 6.0, "euler", "normal", positive, negative, latent, denoise=1.0)
+        assert ra.called

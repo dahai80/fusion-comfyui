@@ -318,6 +318,28 @@ async def _generate_monolithic(model_wrapper, positive, negative, latent_image,
     return latent_image["samples"]
 
 
+async def _generate_staged(model_wrapper, positive, negative, latent_image,
+                           steps, cfg, seed, width, height, num_frames, denoise=1.0,
+                           sampler_name="euler"):
+    engine = model_wrapper.get_engine()
+    await engine.ensure_started()
+    prompt = positive.get("prompt", "")
+    neg_prompt = negative.get("prompt", "") if negative else ""
+    mlx_latent = latent_image["samples"]
+    if not isinstance(mlx_latent, mx.array):
+        from fusion_comfyui.core.bridge import to_mlx_array
+        mlx_latent = to_mlx_array(mlx_latent)
+    logger.info(
+        "_generate_staged: model=%s steps=%d cfg=%.1f seed=%d frames=%d %dx%d",
+        model_wrapper.model_name, steps, cfg, seed, num_frames, width, height,
+    )
+    pixels = await engine._run_staged_pipeline(
+        mlx_latent, prompt=prompt, neg_prompt=neg_prompt,
+        steps=steps, cfg=cfg, seed=seed, num_frames=num_frames,
+    )
+    return _staged_pixels_to_numpy(pixels, model_wrapper.model_type)
+
+
 class KSampler:
     @classmethod
     def INPUT_TYPES(cls):
@@ -386,14 +408,20 @@ class KSampler:
             model.model_name, steps, cfg, seed, num_frames, width, height,
         )
 
-        result = fusion_comfyui.core.async_utils.run_async(
-            _generate_monolithic(
+        if _should_use_staged(model, positive, negative, latent_image, denoise):
+            logger.info("KSampler: staged path selected for %s", model.model_name)
+            generate_coro = _generate_staged(
                 model, positive, negative, latent_image,
                 steps, cfg, seed, width, height, num_frames, denoise=denoise,
                 sampler_name=sampler_name,
-            ),
-            timeout=3600,
-        )
+            )
+        else:
+            generate_coro = _generate_monolithic(
+                model, positive, negative, latent_image,
+                steps, cfg, seed, width, height, num_frames, denoise=denoise,
+                sampler_name=sampler_name,
+            )
+        result = fusion_comfyui.core.async_utils.run_async(generate_coro, timeout=3600)
 
         _i2v_tmp = latent_image.get("_i2v_image_path")
         # Don't delete the temp file here — multi-KSampler workflows (e.g. wan22 14B i2v)

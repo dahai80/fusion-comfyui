@@ -217,6 +217,7 @@ class TestSampleDispatch:
              patch("fusion_comfyui.core.async_utils.run_async", return_value=np.zeros((4, 512, 768, 3), dtype=np.float32)) as ra:
             node.sample(model, 42, 20, 6.0, "euler", "normal", positive, negative, latent, denoise=1.0)
         assert ra.called
+        assert ra.call_args[0][0].__qualname__ == "_generate_monolithic"
 
     def test_cascade_routes_to_monolith(self):
         from nodes.samplers import KSampler
@@ -230,3 +231,4 @@ class TestSampleDispatch:
              patch("fusion_comfyui.core.async_utils.run_async", return_value=prior) as ra:
             node.sample(model, 42, 20, 6.0, "euler", "normal", positive, negative, latent, denoise=1.0)
         assert ra.called
+        assert ra.call_args[0][0].__qualname__ == "_generate_monolithic"

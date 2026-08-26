@@ -63,23 +63,3 @@ class FusionMemoryGuardian:
         except Exception:
             pass
         cls.purge_memory()
-
-
-class PipelineStageContext:
-    def __init__(self, model_wrapper, stage_name: str):
-        self.model_wrapper = model_wrapper
-        self.stage_name = stage_name
-        self._stage_handle = None
-
-    def __enter__(self):
-        FusionMemoryGuardian.maybe_purge()
-        logger.info("PipelineStage: loading '%s'", self.stage_name)
-        self._stage_handle = self.model_wrapper.load_stage(self.stage_name)
-        return self._stage_handle
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        logger.info("PipelineStage: unloading '%s'", self.stage_name)
-        self.model_wrapper.unload_stage(self.stage_name)
-        self._stage_handle = None
-        FusionMemoryGuardian.maybe_purge()
-        return False

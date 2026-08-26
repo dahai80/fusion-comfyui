@@ -268,12 +268,6 @@ class TestFusionEngineWrapper:
         import asyncio
         asyncio.run(e.unload_vae())
 
-    def test_stage_context(self):
-        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
-        e = FusionEngineWrapper(model_name="test-model")
-        ctx = e.stage("dit")
-        assert ctx is not None
-
 
 class TestRunStagedPipeline:
     def _make_wrapper(self, model_type="video"):
@@ -336,3 +330,61 @@ class TestRunStagedPipeline:
         w.denoise.assert_awaited_once()
         w.decode.assert_awaited_once()
         assert isinstance(result, mx.array)
+
+
+class TestStageContext:
+    def test_default_fields_none(self):
+        from fusion_comfyui.core.stage_context import StageContext
+        ctx = StageContext(model_wrapper=object())
+        assert ctx.latent is None
+        assert ctx.pos_cond is None
+        assert ctx.neg_cond is None
+        assert ctx.pixels is None
+        assert ctx.model_type == "video"
+
+    def test_construct_with_fields(self):
+        import mlx.core as mx
+        from fusion_comfyui.core.stage_context import StageContext
+        latent = mx.array(np.zeros((1, 16, 5, 8, 8), dtype=np.float32))
+        ctx = StageContext(
+            model_wrapper=object(), latent=latent, model_type="image",
+        )
+        assert ctx.latent is latent
+        assert ctx.model_type == "image"
+
+    def test_staged_pipeline_populates_ctx_fields(self):
+        # white-box: _run_staged_pipeline threads data through a StageContext.
+        # Capture the ctx via a wrapper that records what denoise/decode receive.
+        import asyncio
+        import mlx.core as mx
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
+
+        w = MagicMock()
+        w.model_type = "video"
+        pos_embed = {"embed": mx.array(np.zeros((1, 256), dtype=np.float32))}
+        neg_embed = {"embed": mx.array(np.zeros((1, 256), dtype=np.float32))}
+        w.load_text_encoder = AsyncMock()
+        w.encode_text = AsyncMock(side_effect=lambda p, neg="": pos_embed if p == "cat" else neg_embed)
+        w.unload_text_encoder = AsyncMock()
+        w.load_dit = AsyncMock()
+        denoised = mx.array(np.zeros((1, 16, 5, 32, 32), dtype=np.float32))
+        w.denoise = AsyncMock(return_value=denoised)
+        w.unload_dit = AsyncMock()
+        w.load_vae = AsyncMock()
+        pixels = mx.array(np.zeros((4, 512, 768, 3), dtype=np.float32))
+        w.decode = AsyncMock(return_value=pixels)
+        w.unload_vae = AsyncMock()
+        w._run_staged_pipeline = FusionEngineWrapper._run_staged_pipeline.__get__(w)
+
+        in_latent = mx.array(np.zeros((1, 16, 5, 32, 32), dtype=np.float32))
+        result = asyncio.run(w._run_staged_pipeline(in_latent, "cat", "dog", 20, 6.0, 42, num_frames=41))
+
+        # denoise received pos_cond and neg_cond (dicts with embed), threaded via ctx
+        dargs = w.denoise.await_args
+        assert dargs.args[1] is pos_embed, "pos_cond not threaded to denoise via ctx"
+        assert dargs.args[2] is neg_embed, "neg_cond not threaded to denoise via ctx"
+        # decode received the denoised latent threaded via ctx
+        cargs = w.decode.await_args
+        assert cargs.args[0] is denoised, "denoised latent not threaded to decode via ctx"
+        # result is the pixels threaded via ctx
+        assert result is pixels, "pixels not returned from ctx"

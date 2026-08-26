@@ -286,6 +286,39 @@ class FusionEngineWrapper:
                 logger.info("stage unloaded: vae for %s", self.model_name)
                 FusionMemoryGuardian.purge_memory()
 
+    async def _run_staged_pipeline(self, latent, prompt, neg_prompt, steps, cfg, seed, num_frames=None):
+        # Staged: text-encode -> denoise -> vae-decode, strict offload between.
+        # Returns decoded pixels mx.array (float [0,1]); caller normalizes to numpy.
+        logger.info("_run_staged_pipeline: start type=%s steps=%d cfg=%.1f seed=%d", self.model_type, steps, cfg, seed)
+        await self.load_text_encoder()
+        try:
+            pos_cond = await self.encode_text(prompt)
+            neg_cond = await self.encode_text(neg_prompt) if (cfg > 1.0 and neg_prompt) else None
+        finally:
+            await self.unload_text_encoder()
+        FusionMemoryGuardian.purge_memory()
+        logger.info("_run_staged_pipeline: text stage done, pos+neg encoded=%s", neg_cond is not None)
+
+        await self.load_dit()
+        try:
+            if self.model_type == "video":
+                latent = await self.denoise(latent, pos_cond, neg_cond, steps=steps, cfg=cfg, seed=seed, num_frames=num_frames)
+            else:
+                latent = await self.denoise(latent, pos_cond, neg_cond, steps=steps, cfg=cfg, seed=seed)
+        finally:
+            await self.unload_dit()
+        FusionMemoryGuardian.purge_memory()
+        logger.info("_run_staged_pipeline: denoise stage done, latent shape=%s", tuple(latent.shape))
+
+        await self.load_vae()
+        try:
+            pixels = await self.decode(latent)
+        finally:
+            await self.unload_vae()
+        FusionMemoryGuardian.purge_memory()
+        logger.info("_run_staged_pipeline: vae stage done, pixels shape=%s", tuple(pixels.shape))
+        return pixels
+
     async def generate_i2v(self, prompt: str, image_path: str, num_frames: int = 49, seed: int = 0, **kwargs):
         async with NodeTimer.timed(self.model_name, "generate_i2v", frames=num_frames, seed=seed):
             await self.ensure_started()

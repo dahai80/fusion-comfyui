@@ -273,3 +273,66 @@ class TestFusionEngineWrapper:
         e = FusionEngineWrapper(model_name="test-model")
         ctx = e.stage("dit")
         assert ctx is not None
+
+
+class TestRunStagedPipeline:
+    def _make_wrapper(self, model_type="video"):
+        import mlx.core as mx
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
+        # spec dropped: _run_staged_pipeline is NEW, spec would block it
+        w = MagicMock()
+        w.model_type = model_type
+        w.load_text_encoder = AsyncMock()
+        w.encode_text = AsyncMock(side_effect=lambda p, neg="": {"embed": mx.array(np.zeros((1, 256), dtype=np.float32))})
+        w.unload_text_encoder = AsyncMock()
+        w.load_dit = AsyncMock()
+        w.denoise = AsyncMock(return_value=mx.array(np.zeros((1, 16, 5, 32, 32), dtype=np.float32)))
+        w.unload_dit = AsyncMock()
+        w.load_vae = AsyncMock()
+        w.decode = AsyncMock(return_value=mx.array(np.zeros((4, 512, 768, 3), dtype=np.float32)))
+        w.unload_vae = AsyncMock()
+        # bind the real method onto the mock so it calls the mocks above
+        w._run_staged_pipeline = FusionEngineWrapper._run_staged_pipeline.__get__(w)
+        return w
+
+    def test_video_full_stage_order_and_purge(self):
+        import asyncio
+        import mlx.core as mx
+        w = self._make_wrapper("video")
+        with patch("fusion_comfyui.core.engine_wrapper.FusionMemoryGuardian.purge_memory") as purge:
+            result = asyncio.run(w._run_staged_pipeline(
+                mx.array(np.zeros((1, 16, 5, 32, 32))), "cat", "dog", 20, 6.0, 42, num_frames=41))
+        assert isinstance(result, mx.array)
+        # Stage call order
+        w.load_text_encoder.assert_awaited_once()
+        assert w.encode_text.await_count == 2  # pos + neg (cfg>1)
+        w.unload_text_encoder.assert_awaited_once()
+        w.load_dit.assert_awaited_once()
+        w.denoise.assert_awaited_once()
+        w.unload_dit.assert_awaited_once()
+        w.load_vae.assert_awaited_once()
+        w.decode.assert_awaited_once()
+        w.unload_vae.assert_awaited_once()
+        # purge between each of the 3 stages
+        assert purge.call_count == 3
+
+    def test_cfg_le_1_skips_negative_encode(self):
+        import asyncio
+        import mlx.core as mx
+        w = self._make_wrapper("video")
+        asyncio.run(w._run_staged_pipeline(
+            mx.array(np.zeros((1, 16, 5, 32, 32))), "cat", "dog", 20, 1.0, 42, num_frames=41))
+        assert w.encode_text.await_count == 1  # positive only
+        # denoise called with neg_cond=None
+        denoise_args = w.denoise.await_args
+        assert denoise_args.args[2] is None or denoise_args.kwargs.get("negative") is None
+
+    def test_image_pipeline_no_num_frames(self):
+        import asyncio
+        import mlx.core as mx
+        w = self._make_wrapper("image")
+        result = asyncio.run(w._run_staged_pipeline(
+            mx.array(np.zeros((1, 16, 32, 32))), "cat", "dog", 20, 6.0, 42))
+        w.denoise.assert_awaited_once()
+        w.decode.assert_awaited_once()
+        assert isinstance(result, mx.array)

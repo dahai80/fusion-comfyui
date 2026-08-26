@@ -42,6 +42,9 @@ class TestImageBatch:
         b = _img(1, 16, 16, 4)
         out = ImageBatch().batch(a, b)
         assert out[0].shape == (2, 16, 16, 4)
+        # padded alpha channel (row 0, was 3-channel -> 4-channel) must be 1.0,
+        # not 0.0 — distinguishes the correct pad value from a wrong one.
+        assert np.all(out[0][0, :, :, 3] == 1.0), "padded alpha should be 1.0, got {}".format(out[0][0, :, :, 3])
 
 
 class TestEmptyImage:

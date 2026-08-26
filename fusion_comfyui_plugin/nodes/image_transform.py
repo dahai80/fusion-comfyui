@@ -165,11 +165,14 @@ class LoadImageMask:
         mask_arr = np.asarray(mask_arr)
         c = channel[0].upper()
         if c == "A":
+            logger.info("LoadImageMask: channel=A shape=%s", mask_arr.shape)
             return (mask_arr,)
         channel_idx = {"R": 0, "G": 1, "B": 2}.get(c, 0)
         if channel_idx < image_arr.shape[-1]:
+            logger.info("LoadImageMask: channel=%s idx=%d shape=%s", c, channel_idx, image_arr[..., channel_idx].shape)
             return (np.ascontiguousarray(image_arr[..., channel_idx]).copy(),)
         empty = np.zeros(image_arr.shape[:-1], dtype=np.float32)
+        logger.info("LoadImageMask: channel=%s no-such-channel, zero mask shape=%s", c, empty.shape)
         return (empty,)
 
     @classmethod

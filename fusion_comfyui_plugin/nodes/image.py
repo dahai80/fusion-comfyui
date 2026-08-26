@@ -27,7 +27,7 @@ class LoadImage:
 
     def load_image(self, image):
         from PIL import Image, ImageOps, ImageSequence
-        from core.bridge import to_image_tensor
+        from fusion_comfyui.core.bridge import to_image_tensor
         import folder_paths
 
         image_path = folder_paths.get_annotated_filepath(image)
@@ -60,11 +60,10 @@ class LoadImage:
 
         output_image = np.stack(output_images, axis=0)
         output_mask = np.stack(output_masks, axis=0)
-        # Core IMAGE/MASK consumers (BatchImagesNode torch.cat, RepeatImageBatch,
-        # MaskToImage) require torch tensors; wrap numpy -> CPU torch tensor.
+        # IMAGE/MASK are numpy NHWC float32 [0,1]; fusion-mlx path is torch-free.
         image_t = to_image_tensor(output_image)
-        import torch
-        mask_t = torch.from_numpy(np.ascontiguousarray(output_mask)).float()
+        from fusion_comfyui.core.bridge import to_mask_numpy
+        mask_t = to_mask_numpy(output_mask)
 
         logger.info("LoadImage: %s shape=%s", image, tuple(image_t.shape))
         return (image_t, mask_t)

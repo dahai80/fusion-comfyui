@@ -23,7 +23,7 @@ class TestFusionLipsyncLoader:
         with patch.object(
             FusionLipsyncLoader, "_load_pipeline",
             new_callable=AsyncMock, return_value=mock_pipeline,
-        ), patch("core.lifecycle.FusionMemoryGuardian.purge_memory"):
+        ), patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.purge_memory"):
             node = FusionLipsyncLoader()
             result = node.load_lipsync("latentsync_unet", "float16")
         assert len(result) == 1
@@ -65,7 +65,7 @@ class TestFusionLipsyncApply:
         ), patch.object(
             FusionLipsyncApply, "_run_lipsync",
             new_callable=AsyncMock, return_value="/tmp/output.mp4",
-        ), patch("core.lifecycle.FusionMemoryGuardian.purge_memory"):
+        ), patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.purge_memory"):
             node = FusionLipsyncApply()
             result = node.apply_lipsync(
                 MagicMock(), "/tmp/video.mp4", "/tmp/audio.wav",

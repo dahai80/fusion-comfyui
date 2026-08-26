@@ -30,7 +30,7 @@ class TestVAEDecode:
         samples = {"_decoded_frames": frames}
         mock_vae = MagicMock()
         node = VAEDecode()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"):
             result = node.decode(mock_vae, samples)
         assert result is not None
 
@@ -40,7 +40,7 @@ class TestVAEDecode:
         samples = {"_decoded_frames": frames}
         mock_vae = MagicMock()
         node = VAEDecode()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"):
             result = node.decode(mock_vae, samples)
         assert result is not None
 
@@ -50,7 +50,7 @@ class TestVAEDecode:
         samples = {"_decoded_frames": frames}
         mock_vae = MagicMock()
         node = VAEDecode()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"):
             result = node.decode(mock_vae, samples)
         assert result is not None
 
@@ -62,7 +62,7 @@ class TestVAEDecode:
         samples = {"_decoded_frames": mx_frames}
         mock_vae = MagicMock()
         node = VAEDecode()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"):
             result = node.decode(mock_vae, samples)
         assert result is not None
 
@@ -71,12 +71,12 @@ class TestVAEDecode:
         mock_vae = MagicMock(spec=[])
         samples = {"samples": np.zeros((1, 4, 64, 64), dtype=np.float32)}
         node = VAEDecode()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"):
             with pytest.raises(RuntimeError, match="FusionVAEWrapper"):
                 node.decode(mock_vae, samples)
 
     def _make_fusion_vae_mock(self, **kw):
-        from core.wrappers import FusionVAEWrapper
+        from fusion_comfyui.core.wrappers import FusionVAEWrapper
         mock_vae = MagicMock(spec=FusionVAEWrapper)
         mock_vae.get_engine = MagicMock(**kw)
         return mock_vae
@@ -90,10 +90,10 @@ class TestVAEDecode:
         mock_vae.model_name = "test"
         samples = {"samples": np.zeros((1, 4, 64, 64), dtype=np.float32)}
         node = VAEDecode()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
-             patch("core.bridge.to_mlx_array", return_value=mx_result), \
-             patch("core.bridge.to_image_array", return_value=np.zeros((1, 512, 512, 3))), \
-             patch("core.async_utils.run_async", return_value=mx_result):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
+             patch("fusion_comfyui.core.bridge.to_mlx_array", return_value=mx_result), \
+             patch("fusion_comfyui.core.bridge.to_image_array", return_value=np.zeros((1, 512, 512, 3))), \
+             patch("fusion_comfyui.core.async_utils.run_async", return_value=mx_result):
             result = node.decode(mock_vae, samples)
         assert result is not None
 
@@ -103,9 +103,9 @@ class TestVAEDecode:
         mock_vae.model_name = "test"
         samples = {"samples": np.zeros((1, 4, 64, 64), dtype=np.float32)}
         node = VAEDecode()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
-             patch("core.bridge.to_mlx_array", return_value=MagicMock()), \
-             patch("core.async_utils.run_async", return_value=np.zeros((1, 512, 512, 3), dtype=np.float32)):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
+             patch("fusion_comfyui.core.bridge.to_mlx_array", return_value=MagicMock()), \
+             patch("fusion_comfyui.core.async_utils.run_async", return_value=np.zeros((1, 512, 512, 3), dtype=np.float32)):
             result = node.decode(mock_vae, samples)
         assert result is not None
 
@@ -118,10 +118,10 @@ class TestVAEDecode:
         mock_vae.model_name = "test"
         samples = {"samples": np.zeros((1, 4, 64, 64), dtype=np.float32)}
         node = VAEDecode()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
-             patch("core.bridge.to_mlx_array", return_value=mx_latent), \
-             patch("core.async_utils.run_async", return_value=mx_latent), \
-             patch("core.bridge.to_image_array", return_value=np.zeros((1, 512, 512, 3))):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
+             patch("fusion_comfyui.core.bridge.to_mlx_array", return_value=mx_latent), \
+             patch("fusion_comfyui.core.async_utils.run_async", return_value=mx_latent), \
+             patch("fusion_comfyui.core.bridge.to_image_array", return_value=np.zeros((1, 512, 512, 3))):
             result = node.decode(mock_vae, samples)
         assert result is not None
 
@@ -138,7 +138,7 @@ class TestVAEDecodeTiled:
         samples = {"_decoded_frames": frames}
         mock_vae = MagicMock()
         node = VAEDecodeTiled()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"):
             result = node.decode(mock_vae, samples, tile_size=256)
         assert result is not None
 
@@ -158,9 +158,9 @@ class TestFusionVAEDecoderNode:
         pipeline.get_memory_stats.return_value = {"active_mb": 100, "peak_mb": 200}
         samples = {"samples": np.zeros((1, 4, 64, 64), dtype=np.float32)}
         node = FusionVAEDecoderNode()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
-             patch("core.bridge.to_mlx_array", return_value=MagicMock()), \
-             patch("core.bridge.to_image_array", return_value=np.zeros((1, 512, 512, 3))), \
-             patch("core.async_utils.run_async", return_value=mx_result):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
+             patch("fusion_comfyui.core.bridge.to_mlx_array", return_value=MagicMock()), \
+             patch("fusion_comfyui.core.bridge.to_image_array", return_value=np.zeros((1, 512, 512, 3))), \
+             patch("fusion_comfyui.core.async_utils.run_async", return_value=mx_result):
             result = node.decode(pipeline, samples, tile_sample_min_size=256)
         assert result is not None

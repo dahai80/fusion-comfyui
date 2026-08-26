@@ -128,7 +128,7 @@ class UNETLoader:
     CATEGORY = "model/loaders"
 
     def load_unet(self, unet_name, weight_dtype="default"):
-        from core.wrappers import FusionModelWrapper, _map_unet_name_to_model_name, _infer_model_type, _resolve_model_path
+        from fusion_comfyui.core.wrappers import FusionModelWrapper, _map_unet_name_to_model_name, _infer_model_type, _resolve_model_path
         model_name = _map_unet_name_to_model_name(unet_name)
         model_type = _infer_model_type(model_name)
         model_path = _resolve_model_path(model_name)
@@ -159,7 +159,7 @@ class CLIPLoader:
     CATEGORY = "model/loaders"
 
     def load_clip(self, clip_name, type="stable_diffusion", device="default"):
-        from core.wrappers import FusionCLIPWrapper, _map_clip_type_to_model_name, _resolve_model_path
+        from fusion_comfyui.core.wrappers import FusionCLIPWrapper, _map_clip_type_to_model_name, _resolve_model_path
         model_name = _map_clip_type_to_model_name(type, clip_name)
         model_path = _resolve_model_path(model_name)
         wrapper = FusionCLIPWrapper(
@@ -187,7 +187,7 @@ class DualCLIPLoader:
     CATEGORY = "model/loaders"
 
     def load_clip(self, clip_name1, clip_name2, type="sdxl"):
-        from core.wrappers import FusionCLIPWrapper, _map_clip_type_to_model_name, _resolve_model_path
+        from fusion_comfyui.core.wrappers import FusionCLIPWrapper, _map_clip_type_to_model_name, _resolve_model_path
         model_name = _map_clip_type_to_model_name(type, clip_name1)
         model_path = _resolve_model_path(model_name)
         wrapper = FusionCLIPWrapper(
@@ -209,7 +209,7 @@ class VAELoader:
     CATEGORY = "model/loaders"
 
     def load_vae(self, vae_name):
-        from core.wrappers import FusionVAEWrapper, _resolve_model_path, _map_vae_name_to_model_name
+        from fusion_comfyui.core.wrappers import FusionVAEWrapper, _resolve_model_path, _map_vae_name_to_model_name
         model_name = _map_vae_name_to_model_name(vae_name)
         model_path = _resolve_model_path(model_name)
         wrapper = FusionVAEWrapper(
@@ -230,7 +230,7 @@ class CheckpointLoaderSimple:
     CATEGORY = "model/loaders"
 
     def load_checkpoint(self, ckpt_name):
-        from core.wrappers import (
+        from fusion_comfyui.core.wrappers import (
             FusionModelWrapper, FusionCLIPWrapper, FusionVAEWrapper,
             _infer_model_type, _resolve_model_path, _map_checkpoint_to_model_name,
         )
@@ -276,8 +276,8 @@ class FusionModelLoaderNode:
     CATEGORY = "Fusion-MLX/Loaders"
 
     def load_pipeline(self, model_name, offload_strategy, quant_bit):
-        from core.wrappers import _map_unet_name_to_model_name, _resolve_model_path
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.wrappers import _map_unet_name_to_model_name, _resolve_model_path
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         resolved_name = _map_unet_name_to_model_name(model_name)
         resolved_path = _resolve_model_path(resolved_name)
         pipeline = FusionEngineWrapper(

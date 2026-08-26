@@ -42,9 +42,9 @@ class TestFusionTextEncoderNode:
 
     def test_encode_success(self):
         from nodes.conditioning import FusionTextEncoderNode
-        from core.wrappers import FusionCLIPWrapper
+        from fusion_comfyui.core.wrappers import FusionCLIPWrapper
         mock_clip = MagicMock(spec=FusionCLIPWrapper)
-        with patch("core.async_utils.run_async", return_value={"embed": MagicMock()}):
+        with patch("fusion_comfyui.core.async_utils.run_async", return_value={"embed": MagicMock()}):
             node = FusionTextEncoderNode()
             result = node.encode(mock_clip, "test prompt")
         assert result is not None
@@ -63,7 +63,7 @@ class TestFusionTextEncoderNode:
         mock_clip = MagicMock(spec=["tokenize", "encode_from_tokens_scheduled"])
         mock_clip.tokenize.return_value = {"text": "hello"}
         mock_clip.encode_from_tokens_scheduled.return_value = {"text": "hello", "clip": mock_clip}
-        with patch("core.async_utils.run_async", return_value={"embed": MagicMock()}):
+        with patch("fusion_comfyui.core.async_utils.run_async", return_value={"embed": MagicMock()}):
             node = FusionTextEncoderNode()
             result = node.encode(mock_clip, "test prompt")
         assert result is not None

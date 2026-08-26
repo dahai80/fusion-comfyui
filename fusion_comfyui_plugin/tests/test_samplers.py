@@ -7,7 +7,7 @@ import mlx.core as mx
 
 
 def _make_mock_model(model_type="image"):
-    from core.wrappers import FusionModelWrapper
+    from fusion_comfyui.core.wrappers import FusionModelWrapper
     mock = MagicMock(spec=FusionModelWrapper)
     mock.model_type = model_type
     mock.model_name = f"test-{model_type}"
@@ -41,7 +41,7 @@ def _run_coro(coro):
 
 class TestRunAsync:
     def test_run_async_no_running_loop(self):
-        from core.async_utils import run_async
+        from fusion_comfyui.core.async_utils import run_async
 
         async def coro():
             return 42
@@ -50,7 +50,7 @@ class TestRunAsync:
         assert result == 42
 
     def test_run_async_with_running_loop(self):
-        from core.async_utils import run_async
+        from fusion_comfyui.core.async_utils import run_async
 
         async def inner():
             async def coro():
@@ -61,7 +61,7 @@ class TestRunAsync:
         assert result == 99
 
     def test_run_async_timeout_default(self):
-        from core.async_utils import run_async
+        from fusion_comfyui.core.async_utils import run_async
         import inspect
         sig = inspect.signature(run_async)
         assert sig.parameters["timeout"].default == 600
@@ -95,7 +95,7 @@ class TestGenerateMonolithic:
         latent = {"samples": np.zeros((1, 4, 64, 64), dtype=np.float32)}
         self._install_mock_av(import_error=True)
         try:
-            with patch("core.bridge.to_mlx_array", return_value=mx.array(np.zeros((1, 4, 64, 64)))):
+            with patch("fusion_comfyui.core.bridge.to_mlx_array", return_value=mx.array(np.zeros((1, 4, 64, 64)))):
                 result = asyncio.run(
                     _generate_monolithic(model, positive, negative, latent, 20, 6.0, 42, 768, 512, 41)
                 )
@@ -118,7 +118,7 @@ class TestGenerateMonolithic:
         }
         self._install_mock_av(import_error=True)
         try:
-            with patch("core.bridge.to_mlx_array", return_value=mx.array(np.zeros((1, 4, 64, 64)))):
+            with patch("fusion_comfyui.core.bridge.to_mlx_array", return_value=mx.array(np.zeros((1, 4, 64, 64)))):
                 _result = asyncio.run(
                     _generate_monolithic(model, positive, negative, latent, 20, 6.0, 42, 768, 512, 41)
                 )
@@ -139,7 +139,7 @@ class TestGenerateMonolithic:
         latent = {"samples": np.zeros((1, 4, 64, 64), dtype=np.float32)}
         self._install_mock_av(import_error=True)
         try:
-            with patch("core.bridge.to_mlx_array", return_value=mx.array(np.zeros((1, 4, 64, 64)))):
+            with patch("fusion_comfyui.core.bridge.to_mlx_array", return_value=mx.array(np.zeros((1, 4, 64, 64)))):
                 _result = asyncio.run(
                     _generate_monolithic(model, positive, negative, latent, 20, 6.0, 42, 768, 512, 41)
                 )
@@ -159,7 +159,7 @@ class TestGenerateMonolithic:
         latent = {"samples": np.zeros((1, 4, 64, 64), dtype=np.float32)}
         self._install_mock_av(import_error=True)
         try:
-            with patch("core.bridge.to_mlx_array", return_value=mx.array(np.zeros((1, 4, 64, 64)))):
+            with patch("fusion_comfyui.core.bridge.to_mlx_array", return_value=mx.array(np.zeros((1, 4, 64, 64)))):
                 _result = asyncio.run(
                     _generate_monolithic(model, positive, negative, latent, 20, 6.0, 42, 768, 512, 41)
                 )
@@ -210,7 +210,7 @@ class TestGenerateMonolithic:
         import sys
         sys.modules["av"] = mock_av
         try:
-            with patch("core.bridge.to_mlx_array", return_value=mx.array(np.zeros((1, 4, 64, 64)))):
+            with patch("fusion_comfyui.core.bridge.to_mlx_array", return_value=mx.array(np.zeros((1, 4, 64, 64)))):
                 result = asyncio.run(
                     _generate_monolithic(model, positive, negative, latent, 20, 6.0, 42, 768, 512, 41)
                 )
@@ -232,7 +232,7 @@ class TestGenerateMonolithic:
         mock_container.close = MagicMock()
         self._install_mock_av(container=mock_container)
         try:
-            with patch("core.bridge.to_mlx_array", return_value=mx.array(np.zeros((1, 4, 64, 64)))):
+            with patch("fusion_comfyui.core.bridge.to_mlx_array", return_value=mx.array(np.zeros((1, 4, 64, 64)))):
                 result = asyncio.run(
                     _generate_monolithic(model, positive, negative, latent, 20, 6.0, 42, 768, 512, 41)
                 )
@@ -306,8 +306,8 @@ class TestKSampler:
         negative = {"prompt": "bad"}
         latent = {"samples": np.zeros((1, 4, 64, 64), dtype=np.float32)}
         node = KSampler()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
-             patch("core.async_utils.run_async", return_value=np.zeros((1, 512, 512, 3), dtype=np.float32)):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
+             patch("fusion_comfyui.core.async_utils.run_async", return_value=np.zeros((1, 512, 512, 3), dtype=np.float32)):
             result = node.sample(model, 42, 20, 6.0, "euler", "normal", positive, negative, latent, denoise=1.0)
         assert result is not None
         assert "_decoded_frames_key" in result[0]
@@ -319,8 +319,8 @@ class TestKSampler:
         negative = {"prompt": "bad"}
         latent = {"samples": np.zeros((1, 16, 5, 64, 64), dtype=np.float32)}
         node = KSampler()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
-             patch("core.async_utils.run_async", return_value=np.zeros((4, 512, 768, 3), dtype=np.float32)):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
+             patch("fusion_comfyui.core.async_utils.run_async", return_value=np.zeros((4, 512, 768, 3), dtype=np.float32)):
             result = node.sample(model, 42, 20, 6.0, "euler", "normal", positive, negative, latent, denoise=1.0)
         assert result is not None
 
@@ -331,8 +331,8 @@ class TestKSampler:
         negative = {"prompt": "bad"}
         latent = {"samples": np.zeros((1, 4, 64, 64), dtype=np.float32)}
         node = KSampler()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
-             patch("core.async_utils.run_async", return_value=np.zeros((512, 768, 3), dtype=np.float32)):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
+             patch("fusion_comfyui.core.async_utils.run_async", return_value=np.zeros((512, 768, 3), dtype=np.float32)):
             result = node.sample(model, 42, 20, 6.0, "euler", "normal", positive, negative, latent, denoise=1.0)
         assert result is not None
 
@@ -344,8 +344,8 @@ class TestKSampler:
         latent = {"samples": np.zeros((1, 4, 64, 64), dtype=np.float32)}
         node = KSampler()
         mx_result = mx.array(np.zeros((1, 4, 64, 64), dtype=np.float32))
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
-             patch("core.async_utils.run_async", return_value=mx_result):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
+             patch("fusion_comfyui.core.async_utils.run_async", return_value=mx_result):
             result = node.sample(model, 42, 20, 6.0, "euler", "normal", positive, negative, latent, denoise=1.0)
         assert result is not None
         assert "samples" in result[0]
@@ -357,8 +357,8 @@ class TestKSampler:
         negative = {"prompt": "bad"}
         latent = {"samples": np.zeros((1, 4, 64, 64), dtype=np.float32)}
         node = KSampler()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
-             patch("core.async_utils.run_async", return_value="unexpected"):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
+             patch("fusion_comfyui.core.async_utils.run_async", return_value="unexpected"):
             result = node.sample(model, 42, 20, 6.0, "euler", "normal", positive, negative, latent, denoise=1.0)
         assert result is not None
 
@@ -369,7 +369,7 @@ class TestKSampler:
         negative = {"prompt": "bad"}
         latent = {"samples": np.zeros((1, 4, 64, 64), dtype=np.float32)}
         node = KSampler()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"):
             with pytest.raises(RuntimeError, match="FusionModelWrapper"):
                 node.sample(model, 42, 20, 6.0, "euler", "normal", positive, negative, latent, denoise=1.0)
 
@@ -380,8 +380,8 @@ class TestKSampler:
         negative = {"prompt": "bad"}
         latent = {"samples": mx.array(np.zeros((1, 4, 64, 64), dtype=np.float32))}
         node = KSampler()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
-             patch("core.async_utils.run_async", return_value=np.zeros((1, 512, 512, 3), dtype=np.float32)):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
+             patch("fusion_comfyui.core.async_utils.run_async", return_value=np.zeros((1, 512, 512, 3), dtype=np.float32)):
             result = node.sample(model, 42, 20, 6.0, "euler", "normal", positive, negative, latent, denoise=1.0)
         assert result is not None
 
@@ -397,8 +397,8 @@ class TestKSampler:
             "height": 512,
         }
         node = KSampler()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
-             patch("core.async_utils.run_async", return_value=np.zeros((4, 512, 768, 3), dtype=np.float32)):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
+             patch("fusion_comfyui.core.async_utils.run_async", return_value=np.zeros((4, 512, 768, 3), dtype=np.float32)):
             result = node.sample(model, 42, 20, 6.0, "euler", "normal", positive, negative, latent, denoise=1.0)
         assert result is not None
 
@@ -416,8 +416,8 @@ class TestKSampler:
             "_i2v_image_path": tmp.name,
         }
         node = KSampler()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
-             patch("core.async_utils.run_async", return_value=np.zeros((4, 512, 768, 3), dtype=np.float32)):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
+             patch("fusion_comfyui.core.async_utils.run_async", return_value=np.zeros((4, 512, 768, 3), dtype=np.float32)):
             _result = node.sample(model, 42, 20, 6.0, "euler", "normal", positive, negative, latent, denoise=1.0)
         import os
         # Temp file is NOT deleted by KSampler — multi-KSampler workflows (e.g. wan22 14B i2v)
@@ -435,8 +435,8 @@ class TestKSampler:
             "_i2v_image_path": "/tmp/nonexistent_file_xyz123.png",
         }
         node = KSampler()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
-             patch("core.async_utils.run_async", return_value=np.zeros((4, 512, 768, 3), dtype=np.float32)):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
+             patch("fusion_comfyui.core.async_utils.run_async", return_value=np.zeros((4, 512, 768, 3), dtype=np.float32)):
             result = node.sample(model, 42, 20, 6.0, "euler", "normal", positive, negative, latent, denoise=1.0)
         assert result is not None
 
@@ -447,8 +447,8 @@ class TestKSampler:
         negative = {"prompt": "bad"}
         latent = {"samples": "weird"}
         node = KSampler()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
-             patch("core.async_utils.run_async", return_value=np.zeros((1, 512, 512, 3), dtype=np.float32)):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
+             patch("fusion_comfyui.core.async_utils.run_async", return_value=np.zeros((1, 512, 512, 3), dtype=np.float32)):
             result = node.sample(model, 42, 20, 6.0, "euler", "normal", positive, negative, latent, denoise=1.0)
         assert result is not None
 
@@ -466,8 +466,8 @@ class TestKSamplerAdvanced:
         negative = {"prompt": "bad"}
         latent = {"samples": np.zeros((1, 4, 64, 64), dtype=np.float32)}
         node = KSamplerAdvanced()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
-             patch("core.async_utils.run_async", return_value=np.zeros((1, 512, 512, 3), dtype=np.float32)):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
+             patch("fusion_comfyui.core.async_utils.run_async", return_value=np.zeros((1, 512, 512, 3), dtype=np.float32)):
             result = node.sample(model, "enable", 42, 20, 6.0, "euler", "normal",
                                  positive, negative, latent)
         assert result is not None
@@ -487,8 +487,8 @@ class TestSamplerCustom:
         latent = {"samples": np.zeros((1, 4, 64, 64), dtype=np.float32)}
         sigmas = np.array([1.0, 0.5, 0.0])
         node = SamplerCustom()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
-             patch("core.async_utils.run_async", return_value=np.zeros((1, 512, 512, 3), dtype=np.float32)):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
+             patch("fusion_comfyui.core.async_utils.run_async", return_value=np.zeros((1, 512, 512, 3), dtype=np.float32)):
             result = node.sample(model, True, 42, 6.0, positive, negative,
                                  "sampler", sigmas, latent)
         assert len(result) == 2
@@ -500,8 +500,8 @@ class TestSamplerCustom:
         negative = {"prompt": "bad"}
         latent = {"samples": np.zeros((1, 4, 64, 64), dtype=np.float32)}
         node = SamplerCustom()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
-             patch("core.async_utils.run_async", return_value=np.zeros((1, 512, 512, 3), dtype=np.float32)):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
+             patch("fusion_comfyui.core.async_utils.run_async", return_value=np.zeros((1, 512, 512, 3), dtype=np.float32)):
             result = node.sample(model, True, 42, 6.0, positive, negative,
                                  "sampler", 42, latent)
         assert len(result) == 2
@@ -539,9 +539,9 @@ class TestFusionKSamplerNode:
         negative = MagicMock()
         latent = {"samples": np.zeros((1, 4, 64, 64), dtype=np.float32)}
         node = FusionKSamplerNode()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
-             patch("core.bridge.to_mlx_array", return_value=mx.array(np.zeros((1, 4, 64, 64)))), \
-             patch("core.async_utils.run_async", return_value=mx.array(np.zeros((1, 4, 64, 64), dtype=np.float32))):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
+             patch("fusion_comfyui.core.bridge.to_mlx_array", return_value=mx.array(np.zeros((1, 4, 64, 64)))), \
+             patch("fusion_comfyui.core.async_utils.run_async", return_value=mx.array(np.zeros((1, 4, 64, 64), dtype=np.float32))):
             result = node.sample(pipeline, positive, negative, latent, 20, 6.0, 42, 1024, 1024, 1)
         assert result is not None
 
@@ -553,9 +553,9 @@ class TestFusionKSamplerNode:
         negative = MagicMock()
         latent = {"samples": np.zeros((1, 4, 64, 64), dtype=np.float32)}
         node = FusionKSamplerNode()
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
-             patch("core.bridge.to_mlx_array", return_value=mx.array(np.zeros((1, 4, 64, 64)))), \
-             patch("core.async_utils.run_async", side_effect=RuntimeError("denoise fail")):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
+             patch("fusion_comfyui.core.bridge.to_mlx_array", return_value=mx.array(np.zeros((1, 4, 64, 64)))), \
+             patch("fusion_comfyui.core.async_utils.run_async", side_effect=RuntimeError("denoise fail")):
             with pytest.raises(RuntimeError):
                 node.sample(pipeline, positive, negative, latent, 20, 6.0, 42, 1024, 1024, 1)
 
@@ -582,19 +582,23 @@ class TestLatentUpscaleOverride:
         assert result[0]["samples"].max() <= 1.0
 
     def test_true_latent_path_defers_to_native(self):
-        import sys
-        import types
         from nodes.samplers import LatentUpscale
         latent = np.zeros((1, 4, 64, 64), dtype=np.float32)
         samples = {"samples": latent}
         node = LatentUpscale()
         fake_common_upscale = MagicMock(return_value=latent)
-        fake_utils = types.ModuleType("comfy.utils")
-        fake_utils.common_upscale = fake_common_upscale
-        fake_comfy = types.ModuleType("comfy")
-        fake_comfy.utils = fake_utils
-        with patch.dict(sys.modules, {"comfy": fake_comfy, "comfy.utils": fake_utils}):
+        with patch("nodes._scaling.common_upscale", fake_common_upscale):
             node.upscale(samples, "bicubic", 512, 512, "disabled")
         assert fake_common_upscale.called
         args = fake_common_upscale.call_args[0]
         assert args[1] == 64 and args[2] == 64
+
+
+def test_latent_upscale_true_latent_numpy():
+    from nodes.samplers import LatentUpscale
+    latent = {
+        "samples": np.random.default_rng(3).random((1, 1, 4, 16, 16)).astype(np.float32),
+    }
+    out = LatentUpscale().upscale(latent, "bilinear", 128, 128, "disabled")
+    assert out[0]["samples"].shape == (1, 1, 4, 16, 16)
+    assert isinstance(out[0]["samples"], np.ndarray)

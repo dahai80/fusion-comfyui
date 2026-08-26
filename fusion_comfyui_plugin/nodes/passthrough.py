@@ -344,7 +344,7 @@ class CosmosImageToVideoLatent:
         if start_image is not None:
             import tempfile
             from PIL import Image as PILImage
-            from core.bridge import to_numpy
+            from fusion_comfyui.core.bridge import to_numpy
             img_arr = to_numpy(start_image)
             if img_arr.ndim == 4:
                 img_arr = img_arr[0]
@@ -388,7 +388,7 @@ class CosmosPredict2ImageToVideoLatent:
         if start_image is not None:
             import tempfile
             from PIL import Image as PILImage
-            from core.bridge import to_numpy
+            from fusion_comfyui.core.bridge import to_numpy
             img_arr = to_numpy(start_image)
             if img_arr.ndim == 4:
                 img_arr = img_arr[0]
@@ -679,7 +679,7 @@ class WanCameraImageToVideo:
         if start_image is not None:
             import tempfile
             from PIL import Image as PILImage
-            from core.bridge import to_numpy
+            from fusion_comfyui.core.bridge import to_numpy
             img_arr = to_numpy(start_image)
             if img_arr.ndim == 4:
                 img_arr = img_arr[0]

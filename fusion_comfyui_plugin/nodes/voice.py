@@ -91,7 +91,7 @@ class FusionVoiceLoaderNode:
     CATEGORY = "Fusion-MLX/Voice"
 
     def load(self, model_name):
-        from core.lifecycle import FusionMemoryGuardian
+        from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
 
         # 旧默认 id (kokoro-82m) 在 hf-mirror 404, 自动重定向到可用 repo (Kokoro-82M-bf16).
         resolved = _TTS_MODEL_ALIASES.get(model_name, model_name)

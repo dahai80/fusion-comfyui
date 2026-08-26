@@ -45,10 +45,13 @@ def _model_present():
 
 
 pytestmark = pytest.mark.skipif(
-    not _has_metal_gpu() or not _model_present(),
+    not _has_metal_gpu()
+    or not _model_present()
+    or os.environ.get("RUN_E2E", "").strip().lower() not in ("1", "true", "yes"),
     reason=(
         "requires Apple Silicon Metal GPU + Wan2.1-1.3B at "
-        f"{MODEL_PATH}; run on a real machine with the model downloaded"
+        f"{MODEL_PATH} + RUN_E2E=1; run on a real machine with the model "
+        "downloaded and real model loading enabled"
     ),
 )
 

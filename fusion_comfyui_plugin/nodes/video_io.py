@@ -213,7 +213,7 @@ class FusionSaveVideoNode:
         return path
 
     def _write_frames(self, images, frames_dir):
-        from core.bridge import to_numpy
+        from fusion_comfyui.core.bridge import to_numpy
         from PIL import Image as PILImage
 
         arr = to_numpy(images)
@@ -237,7 +237,7 @@ class FusionSaveVideoNode:
 
     def _encode_video_av(self, images, output_path, fps, codec, crf):
         import av
-        from core.bridge import to_numpy
+        from fusion_comfyui.core.bridge import to_numpy
 
         arr = to_numpy(images)
         if arr.max() <= 1.0:
@@ -343,7 +343,7 @@ class FusionVideoConcatNode:
     CATEGORY = "Fusion-MLX/Video"
 
     def concat(self, video_a, video_b, fps=24):
-        from core.bridge import to_numpy
+        from fusion_comfyui.core.bridge import to_numpy
 
         arr_a = to_numpy(video_a).astype(np.float32)
         arr_b = to_numpy(video_b).astype(np.float32)

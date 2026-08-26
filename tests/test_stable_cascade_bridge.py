@@ -14,25 +14,25 @@ def cascade_model_installed(monkeypatch):
     # dir. On CI (no model downloaded) it returns None and the wuerstchen ->
     # cascade routing falls through, so stub it to the expected dir to test
     # the routing logic independent of the local filesystem.
-    import fusion_comfyui_plugin.core.wrappers as w
+    import fusion_comfyui.core.wrappers as w
     monkeypatch.setattr(w, "_available_cascade_model", lambda: _CASCADE_DIR)
     return _CASCADE_DIR
 
 
 class TestCascadeRouting:
     def test_fallback_model_routes_cascade_to_prior(self, cascade_model_installed):
-        from fusion_comfyui_plugin.core.wrappers import _fallback_model
+        from fusion_comfyui.core.wrappers import _fallback_model
         resolved = _fallback_model("stable_cascade_stage_b.safetensors")
         assert "cascade" in resolved.lower(), resolved
         logger.info("fallback stage_b -> %s", resolved)
 
     def test_fallback_model_routes_wuerstchen_to_prior(self, cascade_model_installed):
-        from fusion_comfyui_plugin.core.wrappers import _fallback_model
+        from fusion_comfyui.core.wrappers import _fallback_model
         resolved = _fallback_model("wuerstchen_v3_stage_c.safetensors")
         assert "cascade" in resolved.lower(), resolved
 
     def test_fallback_cascade_never_returns_video_model(self, cascade_model_installed):
-        from fusion_comfyui_plugin.core.wrappers import _fallback_model
+        from fusion_comfyui.core.wrappers import _fallback_model
         for ckpt in ("stable_cascade_stage_b.safetensors",
                      "stable_cascade_stage_c.safetensors",
                      "wuerstchen_v3_stage_c.safetensors"):
@@ -41,7 +41,7 @@ class TestCascadeRouting:
             assert "wan" not in low and "flux" not in low and "ltx" not in low, resolved
 
     def test_map_checkpoint_cascade(self, cascade_model_installed):
-        from fusion_comfyui_plugin.core.wrappers import _map_checkpoint_to_model_name
+        from fusion_comfyui.core.wrappers import _map_checkpoint_to_model_name
         for ckpt in ("stable_cascade_stage_b.safetensors",
                      "stable_cascade_stage_c.safetensors",
                      "wuerstchen_v3.safetensors"):
@@ -49,7 +49,7 @@ class TestCascadeRouting:
             assert "cascade" in mapped.lower(), (ckpt, mapped)
 
     def test_is_cascade_name(self):
-        from fusion_comfyui_plugin.core.wrappers import _is_cascade_name
+        from fusion_comfyui.core.wrappers import _is_cascade_name
         assert _is_cascade_name("models--stabilityai--stable-cascade-prior") is True
         assert _is_cascade_name("wuerstchen_v3") is True
         assert _is_cascade_name("wan2.2_vae") is False
@@ -58,7 +58,7 @@ class TestCascadeRouting:
 
 class TestFusionVAEWrapperCascade:
     def test_cascade_vae_has_downscale_ratio_4(self):
-        from fusion_comfyui_plugin.core.wrappers import FusionVAEWrapper
+        from fusion_comfyui.core.wrappers import FusionVAEWrapper
         vae = FusionVAEWrapper(
             model_path="/x", model_name="models--stabilityai--stable-cascade-prior",
         )
@@ -66,13 +66,13 @@ class TestFusionVAEWrapperCascade:
         assert vae._is_cascade is True
 
     def test_non_cascade_vae_downscale_ratio_8(self):
-        from fusion_comfyui_plugin.core.wrappers import FusionVAEWrapper
+        from fusion_comfyui.core.wrappers import FusionVAEWrapper
         vae = FusionVAEWrapper(model_path="/x", model_name="wan2.2_vae")
         assert vae.downscale_ratio == 8
         assert vae._is_cascade is False
 
     def test_cascade_vae_encode_shape(self):
-        from fusion_comfyui_plugin.core.wrappers import FusionVAEWrapper
+        from fusion_comfyui.core.wrappers import FusionVAEWrapper
         vae = FusionVAEWrapper(
             model_path="/x", model_name="models--stabilityai--stable-cascade-prior",
         )
@@ -101,7 +101,7 @@ class TestStableCascadeNodeOverrides:
 
     def test_stage_c_vae_encode_uses_wrapper(self):
         from fusion_comfyui_plugin.nodes.loaders import StableCascade_StageC_VAEEncode
-        from fusion_comfyui_plugin.core.wrappers import FusionVAEWrapper
+        from fusion_comfyui.core.wrappers import FusionVAEWrapper
 
         class _Img:
             shape = (1, 512, 512, 3)
@@ -142,7 +142,7 @@ class TestStableCascadeNodeOverrides:
 
     def test_super_resolution_controlnet_shapes(self):
         from fusion_comfyui_plugin.nodes.loaders import StableCascade_SuperResolutionControlnet
-        from fusion_comfyui_plugin.core.wrappers import FusionVAEWrapper
+        from fusion_comfyui.core.wrappers import FusionVAEWrapper
 
         class _Img:
             shape = (1, 512, 512, 3)

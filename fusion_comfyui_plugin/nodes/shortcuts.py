@@ -8,7 +8,7 @@ import mlx.core as mx
 import numpy as np
 from PIL import Image
 
-import core.async_utils
+import fusion_comfyui.core.async_utils
 
 logger = logging.getLogger("fusion_comfyui.nodes.shortcuts")
 
@@ -114,7 +114,7 @@ class FusionImageGenNode:
 
     def generate(self, pipeline, prompt, negative_prompt="", width=1024, height=1024,
                  steps=20, cfg=6.0, seed=42):
-        from core.lifecycle import FusionMemoryGuardian
+        from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
 
         FusionMemoryGuardian.maybe_purge()
         logger.info(
@@ -130,7 +130,7 @@ class FusionImageGenNode:
         result_raw = None
         for attempt in range(max_retries + 1):
             try:
-                result_raw = core.async_utils.run_async(
+                result_raw = fusion_comfyui.core.async_utils.run_async(
                     self._generate_image(pipeline, prompt, negative_prompt,
                                          width, height, steps, cfg, cur_seed),
                     timeout=600,
@@ -194,7 +194,7 @@ class FusionVideoGenNode:
 
     def generate(self, pipeline, prompt, negative_prompt="", width=768, height=512,
                  num_frames=41, fps=24, steps=30, cfg=5.0, seed=42):
-        from core.lifecycle import FusionMemoryGuardian
+        from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
 
         FusionMemoryGuardian.maybe_purge()
         logger.info(
@@ -203,7 +203,7 @@ class FusionVideoGenNode:
         )
 
         try:
-            video_result = core.async_utils.run_async(
+            video_result = fusion_comfyui.core.async_utils.run_async(
                 self._generate_video(pipeline, prompt, negative_prompt,
                                      width, height, num_frames, fps, steps, cfg, seed),
                 timeout=3600,
@@ -260,6 +260,7 @@ class FusionImageToVideoNode:
                 "steps": ("INT", {"default": 30, "min": 1, "max": 200}),
                 "cfg": ("FLOAT", {"default": 5.0, "min": 0.0, "max": 20.0, "step": 0.1}),
                 "seed": ("INT", {"default": 42, "min": 0, "max": 0xFFFFFFFFFFFFFFFF}),
+                "quantize": (["none", "te4", "dit8", "dit8_te4"], {"default": "none"}),
             }
         }
 
@@ -269,22 +270,23 @@ class FusionImageToVideoNode:
     CATEGORY = "Fusion-MLX/Shortcuts"
 
     def generate(self, pipeline, image, prompt, negative_prompt="", width=768,
-                 height=512, num_frames=41, fps=24, steps=30, cfg=5.0, seed=42):
-        from core.lifecycle import FusionMemoryGuardian
+                 height=512, num_frames=41, fps=24, steps=30, cfg=5.0, seed=42,
+                 quantize="none"):
+        from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
 
         FusionMemoryGuardian.maybe_purge()
         logger.info(
-            "FusionI2V: prompt_len=%d size=%dx%d frames=%d steps=%d cfg=%.1f seed=%d",
-            len(prompt), width, height, num_frames, steps, cfg, seed,
+            "FusionI2V: prompt_len=%d size=%dx%d frames=%d steps=%d cfg=%.1f seed=%d quant=%s",
+            len(prompt), width, height, num_frames, steps, cfg, seed, quantize,
         )
 
         control_image = self._prepare_control_image(image)
 
         try:
-            video_result = core.async_utils.run_async(
+            video_result = fusion_comfyui.core.async_utils.run_async(
                 self._generate_i2v(pipeline, control_image, prompt,
                                    negative_prompt, width, height,
-                                   num_frames, fps, steps, cfg, seed),
+                                   num_frames, fps, steps, cfg, seed, quantize),
                 timeout=3600,
             )
         except Exception as e:
@@ -296,7 +298,7 @@ class FusionImageToVideoNode:
         return (frames_np,)
 
     def _prepare_control_image(self, image):
-        from core.bridge import to_numpy
+        from fusion_comfyui.core.bridge import to_numpy
 
         arr = to_numpy(image)
         if arr.dtype != np.uint8:
@@ -316,7 +318,7 @@ class FusionImageToVideoNode:
 
     async def _generate_i2v(self, pipeline, control_image, prompt,
                              negative_prompt, width, height, num_frames, fps,
-                             steps, cfg, seed):
+                             steps, cfg, seed, quantize="none"):
         await pipeline.ensure_started()
         neg = negative_prompt if negative_prompt else None
         image_input = control_image
@@ -339,6 +341,7 @@ class FusionImageToVideoNode:
                 fps=fps, seed=seed, n=1, num_inference_steps=steps,
                 cfg_scale=cfg, negative_prompt=neg,
                 image=image_input, output_format="raw",
+                quantize=quantize,
             )
             if isinstance(result_raw[0], np.ndarray):
                 logger.info("_generate_i2v: raw frames shape=%s", result_raw[0].shape)
@@ -356,6 +359,7 @@ class FusionImageToVideoNode:
                 fps=fps, seed=seed, n=1, num_inference_steps=steps,
                 cfg_scale=cfg, negative_prompt=neg,
                 image=image_input,
+                quantize=quantize,
             )
             return result_bytes
         finally:
@@ -406,7 +410,7 @@ class FusionIdentityPipelineNode:
     def generate(self, pipeline, reference_image, prompt, negative_prompt="",
                  width=1024, height=1024, steps=20, cfg=6.0,
                  identity_weight=1.0, seed=42):
-        from core.lifecycle import FusionMemoryGuardian
+        from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
 
         FusionMemoryGuardian.maybe_purge()
         bgr = _image_to_bgr(reference_image)
@@ -417,7 +421,7 @@ class FusionIdentityPipelineNode:
         )
 
         try:
-            result_raw = core.async_utils.run_async(
+            result_raw = fusion_comfyui.core.async_utils.run_async(
                 self._generate(pipeline, bgr, prompt, negative_prompt,
                                width, height, steps, cfg, identity_weight, seed),
                 timeout=600,

@@ -15,7 +15,7 @@ def _run_async_hack(coro):
 
 
 def _make_mock_model(model_type="image"):
-    from core.wrappers import FusionModelWrapper
+    from fusion_comfyui.core.wrappers import FusionModelWrapper
     mock = MagicMock(spec=FusionModelWrapper)
     mock.model_type = model_type
     mock.model_name = f"test-{model_type}"
@@ -135,8 +135,8 @@ class TestFusionImageGenNode:
         img = Image.new("RGB", (64, 64), color="red")
         buf = _io.BytesIO()
         img.save(buf, format="PNG")
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
-             patch("core.async_utils.run_async", return_value=[buf.getvalue()]):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"), \
+             patch("fusion_comfyui.core.async_utils.run_async", return_value=[buf.getvalue()]):
             result = node.generate(pipeline, "a cat", "bad", 64, 64, 20, 6.0, 42)
         assert result is not None
         assert isinstance(result[0], np.ndarray)

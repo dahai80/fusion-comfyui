@@ -105,6 +105,16 @@ def pytest_configure(config):
     _video_engine.VideoGenEngine = MagicMock()
     sys.modules["fusion_mlx.engines.video"] = _video_engine
     sys.modules["fusion_mlx.model_registry"] = MagicMock()
+    _public_api = types.ModuleType("fusion_mlx.public_api")
+    _public_api.ImageGenEngine = MagicMock()
+    _public_api.VideoGenEngine = MagicMock()
+    _public_api.EnginePool = MagicMock()
+    _public_api.get_registry = MagicMock(return_value={})
+    _public_api.list_available_models = MagicMock(return_value=[])
+    _public_api.PuLIDPipeline = MagicMock()
+    _public_api.LipsyncPipelineMLX = MagicMock()
+    _public_api.MuseTalkPipeline = MagicMock()
+    sys.modules["fusion_mlx.public_api"] = _public_api
     sys.modules["fusion_mlx.video"] = MagicMock()
     sys.modules["fusion_mlx.video.pulid_mlx"] = MagicMock()
     sys.modules["fusion_mlx.video.pulid_mlx.pipeline"] = MagicMock()
@@ -133,53 +143,6 @@ def pytest_configure(config):
     sys.modules["comfy"] = mock_comfy
     sys.modules["comfy.cli_args"] = mock_comfy.cli_args
     sys.modules["comfy.samplers"] = MagicMock()
-
-    # --- core package + sub-modules ---
-    _core_pkg = types.ModuleType("core")
-    _core_pkg.__path__ = [os.path.join(PLUGIN_ROOT, "core")]
-    _core_pkg.__package__ = "core"
-    sys.modules["core"] = _core_pkg
-
-    _core_async_utils = types.ModuleType("core.async_utils")
-    _core_async_utils.__file__ = os.path.join(PLUGIN_ROOT, "core", "async_utils.py")
-    sys.modules["core.async_utils"] = _core_async_utils
-    try:
-        import importlib
-        real_async_utils = importlib.reload(_core_async_utils)
-        sys.modules["core.async_utils"] = real_async_utils
-        _core_pkg.async_utils = real_async_utils
-    except Exception:
-        _core_async_utils.run_async = MagicMock(return_value=None)
-        _core_async_utils.get_shared_executor = MagicMock()
-        _core_pkg.async_utils = _core_async_utils
-
-    _core_lifecycle = types.ModuleType("core.lifecycle")
-    _core_lifecycle.FusionMemoryGuardian = MagicMock()
-    _core_lifecycle.PipelineStageContext = MagicMock()
-    _core_lifecycle._PURGE_THRESHOLD_MB = 1024
-    sys.modules["core.lifecycle"] = _core_lifecycle
-
-    # Replace stub with real module so PipelineStageContext tests work.
-    try:
-        import importlib
-        real_lifecycle = importlib.reload(_core_lifecycle)
-        sys.modules["core.lifecycle"] = real_lifecycle
-    except Exception:
-        pass
-
-    _core_wrappers = types.ModuleType("core.wrappers")
-    _core_wrappers.FusionModelWrapper = type("FusionModelWrapper", (), {})
-    _core_wrappers.FusionCLIPWrapper = type("FusionCLIPWrapper", (), {})
-    _core_wrappers.FusionVAEWrapper = type("FusionVAEWrapper", (), {})
-    sys.modules["core.wrappers"] = _core_wrappers
-
-    # Replace stub with real module so all classes/functions resolve.
-    try:
-        import importlib
-        real_wrappers = importlib.reload(_core_wrappers)
-        sys.modules["core.wrappers"] = real_wrappers
-    except Exception:
-        pass
 
     # --- nodes package (plugin's nodes, not ComfyUI's) ---
     _nodes_pkg = types.ModuleType("nodes")

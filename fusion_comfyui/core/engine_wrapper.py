@@ -12,6 +12,19 @@ logger = logging.getLogger("fusion_comfyui.core.engine_wrapper")
 
 StepCallback = Callable[[int, int], Awaitable[None]]
 
+
+def _safe_clear_cache():
+    clear = getattr(mx, "clear_cache", None)
+    if clear is not None:
+        clear()
+    else:
+        mx.metal.clear_cache()
+
+
+def _safe_active_memory():
+    fn = getattr(mx, "get_active_memory", None) or mx.metal.get_active_memory
+    return fn()
+
 _MODEL_TYPES = {
     "flux2": "image",
     "flux": "image",
@@ -85,8 +98,8 @@ async def unload_all_fusion_engines():
     except Exception as e:
         logger.debug("EnginePool.shutdown() skipped: %s", e)
     gc.collect()
-    mx.metal.clear_cache()
-    active = mx.metal.get_active_memory() / 1024 / 1024
+    _safe_clear_cache()
+    active = _safe_active_memory() / 1024 / 1024
     logger.info("unload_all_fusion_engines: complete, active_mem=%.0fMB", active)
 
 
@@ -441,7 +454,7 @@ class FusionEngineWrapper:
     def unload_stage(self, stage_name: str):
         logger.info("unload_stage: %s", stage_name)
         gc.collect()
-        mx.metal.clear_cache()
+        _safe_clear_cache()
 
     def stage(self, stage_name: str):
         from .lifecycle import PipelineStageContext
@@ -490,7 +503,7 @@ class FusionEngineWrapper:
         async with NodeTimer.timed("PuLID", "unload_pipeline"):
             self._pulid_pipeline = None
             gc.collect()
-            mx.metal.clear_cache()
+            _safe_clear_cache()
             logger.info("PuLID pipeline unloaded")
 
     # ── LatentSync lifecycle ─────────────────────────────────
@@ -521,7 +534,7 @@ class FusionEngineWrapper:
         async with NodeTimer.timed("LatentSync", "unload_pipeline"):
             self._lipsync_pipeline = None
             gc.collect()
-            mx.metal.clear_cache()
+            _safe_clear_cache()
             logger.info("LatentSync pipeline unloaded")
 
     # ── MuseTalk lifecycle ───────────────────────────────────
@@ -543,7 +556,7 @@ class FusionEngineWrapper:
         async with NodeTimer.timed("MuseTalk", "unload_pipeline"):
             self._musetalk_pipeline = None
             gc.collect()
-            mx.metal.clear_cache()
+            _safe_clear_cache()
             logger.info("MuseTalk pipeline unloaded")
 
     # ── TTS lifecycle ────────────────────────────────────────
@@ -575,7 +588,7 @@ class FusionEngineWrapper:
                 await self._tts_engine.stop()
                 self._tts_engine = None
             gc.collect()
-            mx.metal.clear_cache()
+            _safe_clear_cache()
             logger.info("TTS engine unloaded")
 
     # ── VLM lifecycle ────────────────────────────────────────
@@ -605,7 +618,7 @@ class FusionEngineWrapper:
                 await self._vlm_engine.stop()
                 self._vlm_engine = None
             gc.collect()
-            mx.metal.clear_cache()
+            _safe_clear_cache()
             logger.info("VLM engine unloaded")
 
     # ── Full cleanup ─────────────────────────────────────────

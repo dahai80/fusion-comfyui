@@ -1,6 +1,6 @@
 import logging
 
-import core.async_utils
+import fusion_comfyui.core.async_utils
 
 logger = logging.getLogger("fusion_comfyui.nodes.conditioning")
 
@@ -22,7 +22,7 @@ class CLIPTextEncode:
     CATEGORY = "model/conditioning"
 
     def encode(self, clip, text):
-        from core.wrappers import FusionCLIPWrapper
+        from fusion_comfyui.core.wrappers import FusionCLIPWrapper
 
         if isinstance(clip, FusionCLIPWrapper):
             result = {
@@ -56,13 +56,13 @@ class FusionTextEncoderNode:
     CATEGORY = "Fusion-MLX/Conditioning"
 
     def encode(self, pipeline, prompt, negative_prompt=""):
-        from core.lifecycle import FusionMemoryGuardian
+        from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
 
         FusionMemoryGuardian.maybe_purge()
         logger.info("FusionTextEncoder: encoding prompt_len=%d", len(prompt))
 
         try:
-            result = core.async_utils.run_async(
+            result = fusion_comfyui.core.async_utils.run_async(
                 self._encode_staged(pipeline, prompt, negative_prompt),
                 timeout=300,
             )

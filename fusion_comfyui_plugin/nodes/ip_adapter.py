@@ -22,7 +22,7 @@ import mlx.nn as nn
 import numpy as np
 from PIL import Image
 
-import core.async_utils
+import fusion_comfyui.core.async_utils
 
 logger = logging.getLogger("fusion_comfyui.nodes.ip_adapter")
 
@@ -902,7 +902,7 @@ class FusionIPAdapterLoader:
 
     def load_ip_adapter(self, ipadapter, siglip_model="siglip-so400m-patch14-384",
                         num_tokens=128, dtype="float16"):
-        from core.lifecycle import FusionMemoryGuardian
+        from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
         FusionMemoryGuardian.maybe_purge()
 
         ip_ckpt_path = _resolve_ip_adapter_path(ipadapter)
@@ -1001,7 +1001,7 @@ class FusionIPAdapterInject:
 
     def generate(self, pipeline, ip_adapter_embed, prompt, negative_prompt="",
                  width=1024, height=1024, steps=20, cfg=4.0, seed=42):
-        from core.lifecycle import FusionMemoryGuardian
+        from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
 
         FusionMemoryGuardian.maybe_purge()
 
@@ -1017,7 +1017,7 @@ class FusionIPAdapterInject:
         ip_pipeline.set_image_embeds(image_embeds)
 
         try:
-            result_raw = core.async_utils.run_async(
+            result_raw = fusion_comfyui.core.async_utils.run_async(
                 self._generate_with_ip(
                     pipeline, ip_pipeline, prompt, negative_prompt,
                     width, height, steps, cfg, seed,

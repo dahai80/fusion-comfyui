@@ -4,21 +4,21 @@ from unittest.mock import MagicMock, patch, AsyncMock
 
 class TestInferModelType:
     def test_wan(self):
-        from core.engine_wrapper import _infer_model_type
+        from fusion_comfyui.core.engine_wrapper import _infer_model_type
         assert _infer_model_type("Wan2.2-5B") == "video"
 
     def test_flux(self):
-        from core.engine_wrapper import _infer_model_type
+        from fusion_comfyui.core.engine_wrapper import _infer_model_type
         assert _infer_model_type("FLUX.2-dev") == "image"
 
     def test_unknown(self):
-        from core.engine_wrapper import _infer_model_type
+        from fusion_comfyui.core.engine_wrapper import _infer_model_type
         assert _infer_model_type("something-else") == "image"
 
 
 class TestFusionEngineWrapper:
     def test_init_defaults(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="test-model")
         assert e.model_name == "test-model"
         assert e.offload_strategy == "sequential"
@@ -27,30 +27,30 @@ class TestFusionEngineWrapper:
         assert e._started is False
 
     def test_init_video_model(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="Wan2.2-5B")
         assert e.model_type == "video"
 
     def test_set_progress_callback(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="test-model")
         cb = MagicMock()
         e.set_progress_callback(cb)
         assert e._on_step is cb
 
     def test_load_stage(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="test-model")
         result = e.load_stage("encode")
         assert result is e
 
     def test_unload_stage(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="test-model")
         e.unload_stage("dit")
 
     def test_get_memory_stats(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="test-model")
         with patch("mlx.core.metal.get_active_memory", return_value=100 * 1024 * 1024), \
              patch("mlx.core.metal.get_peak_memory", return_value=200 * 1024 * 1024):
@@ -61,7 +61,7 @@ class TestFusionEngineWrapper:
             assert stats["started"] is False
 
     def test_stop_not_started(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="test-model")
         result = e.stop()
         import inspect
@@ -69,7 +69,7 @@ class TestFusionEngineWrapper:
         result.close()
 
     def test_stop_started(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="test-model")
         e._started = True
         e._engine = MagicMock()
@@ -79,9 +79,9 @@ class TestFusionEngineWrapper:
         assert e._started is False
 
     def test_ensure_started_image(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="flux2-model", quant_bit="fp8_e4m3")
-        with patch("fusion_mlx.engines.image_gen.ImageGenEngine") as MockEngine:
+        with patch("fusion_mlx.public_api.ImageGenEngine") as MockEngine:
             mock_inst = MagicMock()
             mock_inst.start = AsyncMock()
             MockEngine.return_value = mock_inst
@@ -91,9 +91,9 @@ class TestFusionEngineWrapper:
             MockEngine.assert_called_once()
 
     def test_ensure_started_video(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="Wan2.2-5B", quant_bit="fp8_e4m3")
-        with patch("fusion_mlx.engines.video.VideoGenEngine") as MockEngine:
+        with patch("fusion_mlx.public_api.VideoGenEngine") as MockEngine:
             mock_inst = MagicMock()
             mock_inst.start = AsyncMock()
             MockEngine.return_value = mock_inst
@@ -102,7 +102,7 @@ class TestFusionEngineWrapper:
             assert e._started is True
 
     def test_ensure_started_already(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="test-model")
         e._started = True
         import asyncio
@@ -110,7 +110,7 @@ class TestFusionEngineWrapper:
         assert e._started is True
 
     def test_load_text_encoder(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="test-model")
         e._started = True
         e._engine = MagicMock()
@@ -119,7 +119,7 @@ class TestFusionEngineWrapper:
         asyncio.run(e.load_text_encoder())
 
     def test_encode_text(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="test-model")
         e._started = True
         e._engine = MagicMock()
@@ -131,7 +131,7 @@ class TestFusionEngineWrapper:
         assert result["negative_prompt"] == "bad"
 
     def test_unload_text_encoder(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="test-model")
         e._started = True
         e._engine = MagicMock()
@@ -140,7 +140,7 @@ class TestFusionEngineWrapper:
         asyncio.run(e.unload_text_encoder())
 
     def test_load_dit(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="test-model")
         e._started = True
         e._engine = MagicMock()
@@ -149,7 +149,7 @@ class TestFusionEngineWrapper:
         asyncio.run(e.load_dit())
 
     def test_denoise_with_embed(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="test-model")
         e._started = True
         e._engine = MagicMock()
@@ -163,7 +163,7 @@ class TestFusionEngineWrapper:
         assert result is not None
 
     def test_denoise_video(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="Wan2.2-5B")
         e._started = True
         e._engine = MagicMock()
@@ -176,7 +176,7 @@ class TestFusionEngineWrapper:
         _result = asyncio.run(e.denoise(MagicMock(), positive, negative, steps=20, cfg=6.0, seed=42, num_frames=41))
 
     def test_denoise_fallback_no_embed(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="test-model")
         e._started = True
         e._engine = MagicMock()
@@ -192,7 +192,7 @@ class TestFusionEngineWrapper:
                 _result = asyncio.run(e.denoise(MagicMock(), positive, negative, steps=20, cfg=6.0, seed=42, width=512, height=512))
 
     def test_denoise_fallback_video(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="Wan2.2-5B")
         e._started = True
         e._engine = MagicMock()
@@ -200,16 +200,15 @@ class TestFusionEngineWrapper:
         positive = {"prompt": "hello"}
         negative = {"negative_prompt": "bad", "embed": MagicMock()}
         import asyncio
-        mock_frame = MagicMock()
-        mock_frame.to_ndarray.return_value = np.zeros((512, 512, 3), dtype=np.uint8)
-        mock_container = MagicMock()
-        mock_container.decode.return_value = [mock_frame]
-        mock_container.close = MagicMock()
-        with patch("av.open", return_value=mock_container):
+        mock_frame = np.zeros((512, 512, 3), dtype=np.uint8)
+        mock_reader = MagicMock()
+        mock_reader.__iter__ = MagicMock(return_value=iter([mock_frame]))
+        mock_reader.close = MagicMock()
+        with patch("imageio.get_reader", return_value=mock_reader):
             _result = asyncio.run(e.denoise(MagicMock(), positive, negative, steps=20, cfg=6.0, seed=42, num_frames=4))
 
     def test_unload_dit(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="test-model")
         e._started = True
         e._engine = MagicMock()
@@ -218,7 +217,7 @@ class TestFusionEngineWrapper:
         asyncio.run(e.unload_dit())
 
     def test_load_vae(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="test-model")
         e._started = True
         e._engine = MagicMock()
@@ -227,7 +226,7 @@ class TestFusionEngineWrapper:
         asyncio.run(e.load_vae())
 
     def test_decode(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="test-model")
         e._started = True
         e._engine = MagicMock()
@@ -239,7 +238,7 @@ class TestFusionEngineWrapper:
         assert result is mock_result
 
     def test_decode_tiled(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="test-model")
         e._started = True
         e._engine = MagicMock()
@@ -250,7 +249,7 @@ class TestFusionEngineWrapper:
         _result = asyncio.run(e.decode_tiled(MagicMock(), tile_size=256))
 
     def test_decode_tiled_no_method(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="test-model")
         e._started = True
         e._engine = MagicMock(spec=["decode", "start"])
@@ -261,7 +260,7 @@ class TestFusionEngineWrapper:
         _result = asyncio.run(e.decode_tiled(MagicMock(), tile_size=256))
 
     def test_unload_vae(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="test-model")
         e._started = True
         e._engine = MagicMock()
@@ -270,7 +269,7 @@ class TestFusionEngineWrapper:
         asyncio.run(e.unload_vae())
 
     def test_stage_context(self):
-        from core.engine_wrapper import FusionEngineWrapper
+        from fusion_comfyui.core.engine_wrapper import FusionEngineWrapper
         e = FusionEngineWrapper(model_name="test-model")
         ctx = e.stage("dit")
         assert ctx is not None

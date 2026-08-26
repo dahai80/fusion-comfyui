@@ -9,10 +9,10 @@ class TestUNETLoader:
 
     def test_load_unet(self):
         from nodes.loaders import UNETLoader
-        with patch("core.wrappers._resolve_model_path", return_value="/tmp/m"), \
-             patch("core.wrappers._map_unet_name_to_model_name", return_value="test"), \
-             patch("core.wrappers._infer_model_type", return_value="video"), \
-             patch("core.wrappers.FusionModelWrapper") as MockWrap:
+        with patch("fusion_comfyui.core.wrappers._resolve_model_path", return_value="/tmp/m"), \
+             patch("fusion_comfyui.core.wrappers._map_unet_name_to_model_name", return_value="test"), \
+             patch("fusion_comfyui.core.wrappers._infer_model_type", return_value="video"), \
+             patch("fusion_comfyui.core.wrappers.FusionModelWrapper") as MockWrap:
             MockWrap.return_value = MagicMock()
             node = UNETLoader()
             result = node.load_unet("test-model")
@@ -27,9 +27,9 @@ class TestCLIPLoader:
 
     def test_load_clip(self):
         from nodes.loaders import CLIPLoader
-        with patch("core.wrappers._resolve_model_path", return_value="/tmp/m"), \
-             patch("core.wrappers._map_clip_type_to_model_name", return_value="test"), \
-             patch("core.wrappers.FusionCLIPWrapper") as MockWrap:
+        with patch("fusion_comfyui.core.wrappers._resolve_model_path", return_value="/tmp/m"), \
+             patch("fusion_comfyui.core.wrappers._map_clip_type_to_model_name", return_value="test"), \
+             patch("fusion_comfyui.core.wrappers.FusionCLIPWrapper") as MockWrap:
             MockWrap.return_value = MagicMock()
             node = CLIPLoader()
             result = node.load_clip("test-model", "wan")
@@ -44,9 +44,9 @@ class TestDualCLIPLoader:
 
     def test_load_clip(self):
         from nodes.loaders import DualCLIPLoader
-        with patch("core.wrappers._resolve_model_path", return_value="/tmp/m"), \
-             patch("core.wrappers._map_clip_type_to_model_name", return_value="test"), \
-             patch("core.wrappers.FusionCLIPWrapper") as MockWrap:
+        with patch("fusion_comfyui.core.wrappers._resolve_model_path", return_value="/tmp/m"), \
+             patch("fusion_comfyui.core.wrappers._map_clip_type_to_model_name", return_value="test"), \
+             patch("fusion_comfyui.core.wrappers.FusionCLIPWrapper") as MockWrap:
             MockWrap.return_value = MagicMock()
             node = DualCLIPLoader()
             result = node.load_clip("test-model", "wan", "test-model2")
@@ -61,9 +61,9 @@ class TestVAELoader:
 
     def test_load_vae(self):
         from nodes.loaders import VAELoader
-        with patch("core.wrappers._resolve_model_path", return_value="/tmp/m"), \
-             patch("core.wrappers._map_vae_name_to_model_name", return_value="test"), \
-             patch("core.wrappers.FusionVAEWrapper") as MockWrap:
+        with patch("fusion_comfyui.core.wrappers._resolve_model_path", return_value="/tmp/m"), \
+             patch("fusion_comfyui.core.wrappers._map_vae_name_to_model_name", return_value="test"), \
+             patch("fusion_comfyui.core.wrappers.FusionVAEWrapper") as MockWrap:
             MockWrap.return_value = MagicMock()
             node = VAELoader()
             result = node.load_vae("test-model")
@@ -78,14 +78,14 @@ class TestCheckpointLoaderSimple:
 
     def test_load_checkpoint(self):
         from nodes.loaders import CheckpointLoaderSimple
-        with patch("core.wrappers._resolve_model_path", return_value="/tmp/m"), \
-             patch("core.wrappers._map_checkpoint_to_model_name", return_value="test"), \
-             patch("core.wrappers._infer_model_type", return_value="video"), \
-             patch("core.wrappers._map_clip_type_to_model_name", return_value="test"), \
-             patch("core.wrappers._map_vae_name_to_model_name", return_value="test"), \
-             patch("core.wrappers.FusionModelWrapper") as MockModel, \
-             patch("core.wrappers.FusionCLIPWrapper") as MockClip, \
-             patch("core.wrappers.FusionVAEWrapper") as MockVae:
+        with patch("fusion_comfyui.core.wrappers._resolve_model_path", return_value="/tmp/m"), \
+             patch("fusion_comfyui.core.wrappers._map_checkpoint_to_model_name", return_value="test"), \
+             patch("fusion_comfyui.core.wrappers._infer_model_type", return_value="video"), \
+             patch("fusion_comfyui.core.wrappers._map_clip_type_to_model_name", return_value="test"), \
+             patch("fusion_comfyui.core.wrappers._map_vae_name_to_model_name", return_value="test"), \
+             patch("fusion_comfyui.core.wrappers.FusionModelWrapper") as MockModel, \
+             patch("fusion_comfyui.core.wrappers.FusionCLIPWrapper") as MockClip, \
+             patch("fusion_comfyui.core.wrappers.FusionVAEWrapper") as MockVae:
             MockModel.return_value = MagicMock()
             MockClip.return_value = MagicMock()
             MockVae.return_value = MagicMock()
@@ -102,13 +102,13 @@ class TestFusionModelLoaderNode:
 
     def test_load_pipeline(self):
         from nodes.loaders import FusionModelLoaderNode
-        with patch("core.wrappers._resolve_model_path", return_value="/tmp/m"), \
-             patch("core.wrappers._infer_model_type", return_value="video"), \
-             patch("core.wrappers._map_clip_type_to_model_name", return_value="test"), \
-             patch("core.wrappers._map_vae_name_to_model_name", return_value="test"), \
-             patch("core.wrappers.FusionModelWrapper") as MockModel, \
-             patch("core.wrappers.FusionCLIPWrapper") as MockClip, \
-             patch("core.wrappers.FusionVAEWrapper") as MockVae:
+        with patch("fusion_comfyui.core.wrappers._resolve_model_path", return_value="/tmp/m"), \
+             patch("fusion_comfyui.core.wrappers._infer_model_type", return_value="video"), \
+             patch("fusion_comfyui.core.wrappers._map_clip_type_to_model_name", return_value="test"), \
+             patch("fusion_comfyui.core.wrappers._map_vae_name_to_model_name", return_value="test"), \
+             patch("fusion_comfyui.core.wrappers.FusionModelWrapper") as MockModel, \
+             patch("fusion_comfyui.core.wrappers.FusionCLIPWrapper") as MockClip, \
+             patch("fusion_comfyui.core.wrappers.FusionVAEWrapper") as MockVae:
             MockModel.return_value = MagicMock()
             MockClip.return_value = MagicMock()
             MockVae.return_value = MagicMock()

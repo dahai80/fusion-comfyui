@@ -1,15 +1,7 @@
 import logging
 import os
-import sys
 
 logger = logging.getLogger("fusion_comfyui")
-
-# Ensure `from core.xxx` lazy imports inside node methods resolve correctly.
-# ComfyUI loads custom nodes via importlib without adding the plugin dir to sys.path,
-# so bare `from core.wrappers` etc. would fail at runtime.
-_PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
-if _PLUGIN_DIR not in sys.path:
-    sys.path.insert(0, _PLUGIN_DIR)
 
 _torch_stub_installed = False
 
@@ -34,7 +26,7 @@ def _install_torch_stub():
 if os.environ.get("FUSION_MLX_NO_STUB", "").strip().lower() not in ("1", "true", "yes"):
     _install_torch_stub()
 
-from .core.lifecycle import FusionMemoryGuardian
+from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
 from .nodes.loaders import (
     FusionModelLoaderNode,
     UNETLoader,

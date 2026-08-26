@@ -27,7 +27,7 @@ class LoadImage:
 
     def load_image(self, image):
         from PIL import Image, ImageOps, ImageSequence
-        from core.bridge import to_image_tensor
+        from fusion_comfyui.core.bridge import to_image_tensor
         import folder_paths
 
         image_path = folder_paths.get_annotated_filepath(image)

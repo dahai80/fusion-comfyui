@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
-import core.async_utils
+import fusion_comfyui.core.async_utils
 
 logger = logging.getLogger("fusion_comfyui.nodes.identity")
 
@@ -93,7 +93,7 @@ class FusionIdentityLoader:
     CATEGORY = "Fusion-MLX/Identity"
 
     def load_identity(self, model_name, dtype="float16"):
-        from core.lifecycle import FusionMemoryGuardian
+        from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
 
         FusionMemoryGuardian.maybe_purge()
         model_path = _resolve_pulid_path(model_name)
@@ -103,7 +103,7 @@ class FusionIdentityLoader:
         mx_dtype = dtype_map.get(dtype, "float16")
 
         try:
-            pipeline = core.async_utils.run_async(
+            pipeline = fusion_comfyui.core.async_utils.run_async(
                 self._load_pipeline(model_path, mx_dtype), timeout=120,
             )
         except Exception as e:
@@ -192,7 +192,7 @@ class FusionIdentityGenerate:
     def generate(self, pipeline, identity_model, reference_image, prompt,
                  negative_prompt="", width=1024, height=1024, steps=20,
                  cfg=6.0, identity_weight=1.0, seed=42):
-        from core.lifecycle import FusionMemoryGuardian
+        from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
 
         FusionMemoryGuardian.maybe_purge()
         bgr = _image_to_bgr(reference_image)
@@ -208,7 +208,7 @@ class FusionIdentityGenerate:
             logger.info("FusionIdentityGenerate: id_embedding shape=%s", id_embedding.shape)
             identity_model.inject_id(id_embedding)
 
-            result_raw = core.async_utils.run_async(
+            result_raw = fusion_comfyui.core.async_utils.run_async(
                 self._generate_with_identity(
                     pipeline, prompt, negative_prompt,
                     width, height, steps, cfg, seed,

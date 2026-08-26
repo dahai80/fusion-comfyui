@@ -46,7 +46,7 @@ class TestFusionSaveVideoNode:
         tmpdir = tempfile.mkdtemp()
         with patch("folder_paths.get_output_directory", return_value=tmpdir), \
              patch("folder_paths.get_save_image_path", return_value=(tmpdir, "test", 1, "", "ComfyUI")), \
-             patch("core.bridge.to_numpy", return_value=frames), \
+             patch("fusion_comfyui.core.bridge.to_numpy", return_value=frames), \
              patch("av.open") as mock_av:
             mock_container = MagicMock()
             mock_av.return_value = mock_container

@@ -8,7 +8,7 @@ import pytest
 # The plugin directory name "ComfyUI-Fusion-MLX" contains a hyphen, making
 # `from custom_nodes.ComfyUI-Fusion-MLX.xxx` a SyntaxError.  We solve this
 # by adding the plugin dir itself to sys.path so we can import core/nodes
-# directly:  `from core.wrappers import FusionModelWrapper`
+# directly:  `from fusion_comfyui.core.wrappers import FusionModelWrapper`
 #
 # All heavy mock setup lives in the root conftest.py's pytest_configure hook,
 # which runs before package discovery so __init__.py relative imports resolve.
@@ -32,7 +32,7 @@ def mock_mlx_zeros():
 
 @pytest.fixture
 def sample_model_wrapper():
-    from core.wrappers import FusionModelWrapper
+    from fusion_comfyui.core.wrappers import FusionModelWrapper
     return FusionModelWrapper(
         model_path="/tmp/test_model",
         model_name="test-model",
@@ -42,7 +42,7 @@ def sample_model_wrapper():
 
 @pytest.fixture
 def sample_clip_wrapper():
-    from core.wrappers import FusionCLIPWrapper
+    from fusion_comfyui.core.wrappers import FusionCLIPWrapper
     return FusionCLIPWrapper(
         model_path="/tmp/test_model",
         model_name="test-model",
@@ -52,7 +52,7 @@ def sample_clip_wrapper():
 
 @pytest.fixture
 def sample_vae_wrapper():
-    from core.wrappers import FusionVAEWrapper
+    from fusion_comfyui.core.wrappers import FusionVAEWrapper
     return FusionVAEWrapper(
         model_path="/tmp/test_model",
         model_name="test-model",

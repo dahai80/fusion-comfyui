@@ -5,7 +5,6 @@ User instruction: "继续IPAdapter-Flux MLX 移植"
 """
 import sys
 import os
-import types
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -55,12 +54,6 @@ if "folder_paths" not in sys.modules:
     mock_fp = MagicMock()
     mock_fp.models_dir = "/tmp/models"
     sys.modules.setdefault("folder_paths", mock_fp)
-
-if "core" not in sys.modules:
-    _core_pkg = types.ModuleType("core")
-    _core_pkg.__path__ = [os.path.join(PLUGIN_ROOT, "core")]
-    _core_pkg.__package__ = "core"
-    sys.modules["core"] = _core_pkg
 
 from nodes.ip_adapter import (
     SigLIPVisionEncoder,

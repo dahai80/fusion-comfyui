@@ -4,7 +4,7 @@ import logging
 import mlx.core as mx
 import numpy as np
 
-import core.async_utils
+import fusion_comfyui.core.async_utils
 from ._sampler_constants import SAMPLER_NAMES, SCHEDULER_NAMES, normalize_sampler
 
 logger = logging.getLogger("fusion_comfyui.nodes.samplers")
@@ -140,15 +140,15 @@ async def _generate_monolithic(model_wrapper, positive, negative, latent_image,
             logger.info("_generate_monolithic: decoded %d frames from mp4 (av in-memory)", len(frames))
         except ImportError:
             logger.warning("av not available, returning empty latent")
-            from core.bridge import to_mlx_array
+            from fusion_comfyui.core.bridge import to_mlx_array
             return to_mlx_array(latent_image["samples"])
         except Exception as e:
             logger.error("_generate_monolithic: failed to decode mp4: %s", e)
-            from core.bridge import to_mlx_array
+            from fusion_comfyui.core.bridge import to_mlx_array
             return to_mlx_array(latent_image["samples"])
 
         if not frames:
-            from core.bridge import to_mlx_array
+            from fusion_comfyui.core.bridge import to_mlx_array
             return to_mlx_array(latent_image["samples"])
 
         return np.stack(frames, axis=0)
@@ -268,8 +268,8 @@ class KSampler:
 
     def sample(self, model, seed, steps, cfg, sampler_name, scheduler,
                positive, negative, latent_image, denoise=1.0):
-        from core.wrappers import FusionModelWrapper
-        from core.lifecycle import FusionMemoryGuardian
+        from fusion_comfyui.core.wrappers import FusionModelWrapper
+        from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
 
         seed = seed & 0xFFFFFFFF
         FusionMemoryGuardian.maybe_purge()
@@ -313,7 +313,7 @@ class KSampler:
             model.model_name, steps, cfg, seed, num_frames, width, height,
         )
 
-        result = core.async_utils.run_async(
+        result = fusion_comfyui.core.async_utils.run_async(
             _generate_monolithic(
                 model, positive, negative, latent_image,
                 steps, cfg, seed, width, height, num_frames, denoise=denoise,
@@ -443,7 +443,7 @@ class SamplerCustomAdvanced:
     CATEGORY = "model/sampling"
 
     def sample(self, noise, guider, sampler, sigmas, latent_image):
-        from core.wrappers import FusionModelWrapper
+        from fusion_comfyui.core.wrappers import FusionModelWrapper
         model = guider.get("model") if isinstance(guider, dict) else getattr(guider, "model", None)
         conditioning = guider.get("conditioning") if isinstance(guider, dict) else getattr(guider, "conditioning", None)
         noise_seed = noise.get("noise_seed", 0) if isinstance(noise, dict) else 0
@@ -495,8 +495,8 @@ class FusionKSamplerNode:
 
     def sample(self, pipeline, positive, negative, latent_image, steps, cfg, seed,
                width=1024, height=1024, num_frames=1):
-        from core.bridge import to_mlx_array
-        from core.lifecycle import FusionMemoryGuardian
+        from fusion_comfyui.core.bridge import to_mlx_array
+        from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
 
         seed = seed & 0xFFFFFFFF
         FusionMemoryGuardian.maybe_purge()
@@ -509,7 +509,7 @@ class FusionKSamplerNode:
         mlx_latent = to_mlx_array(raw_samples)
 
         try:
-            output_mlx = core.async_utils.run_async(
+            output_mlx = fusion_comfyui.core.async_utils.run_async(
                 self._sample_staged(
                     pipeline, mlx_latent, positive, negative,
                     steps, cfg, seed, width, height, num_frames,

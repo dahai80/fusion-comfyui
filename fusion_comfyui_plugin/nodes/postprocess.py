@@ -37,7 +37,7 @@ class FusionSubtitleOverlayNode:
     def overlay(self, images, text, font_size=36, position="bottom", margin=40,
                 font_color="white", stroke_color="black", stroke_width=2,
                 bg_opacity=0.5, max_width_ratio=0.9, font_path=""):
-        from core.bridge import to_numpy
+        from fusion_comfyui.core.bridge import to_numpy
 
         if not text:
             return (images,)

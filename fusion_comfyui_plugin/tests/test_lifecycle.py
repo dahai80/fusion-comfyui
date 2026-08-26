@@ -3,12 +3,12 @@ from unittest.mock import MagicMock, patch
 
 class TestFusionMemoryGuardian:
     def test_purge_memory(self):
-        from core.lifecycle import FusionMemoryGuardian
+        from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
         with patch("mlx.core.clear_cache"):
             FusionMemoryGuardian.purge_memory()
 
     def test_purge_memory_deep_clean(self):
-        from core.lifecycle import FusionMemoryGuardian
+        from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
         with patch("mlx.core.clear_cache"), \
              patch("gc.collect"):
             FusionMemoryGuardian.purge_memory(deep_clean=True)
@@ -17,7 +17,7 @@ class TestFusionMemoryGuardian:
         # Regression guard: purge_memory MUST NOT call the deprecated
         # mx.metal.clear_cache(), which corrupts live Metal command buffers
         # mid-generation (Invalid Resource abort). It must use mx.clear_cache.
-        from core.lifecycle import FusionMemoryGuardian
+        from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
         import mlx.core as mx
         with patch("mlx.core.clear_cache") as mock_clear, \
              patch.object(mx.metal, "clear_cache") as mock_deprecated:
@@ -28,22 +28,22 @@ class TestFusionMemoryGuardian:
             )
 
     def test_setup_environment(self):
-        from core.lifecycle import FusionMemoryGuardian
+        from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
         FusionMemoryGuardian.setup_environment()
 
 
 class TestPipelineStageContext:
     def test_init(self):
-        from core.lifecycle import PipelineStageContext
+        from fusion_comfyui.core.lifecycle import PipelineStageContext
         mock_wrapper = MagicMock()
         ctx = PipelineStageContext(model_wrapper=mock_wrapper, stage_name="encode")
         assert ctx.stage_name == "encode"
 
     def test_context_manager(self):
-        from core.lifecycle import PipelineStageContext
+        from fusion_comfyui.core.lifecycle import PipelineStageContext
         mock_wrapper = MagicMock()
         mock_wrapper.load_stage.return_value = "handle"
-        with patch("core.lifecycle.FusionMemoryGuardian.maybe_purge"):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.maybe_purge"):
             ctx = PipelineStageContext(model_wrapper=mock_wrapper, stage_name="encode")
             with ctx as handle:
                 assert handle == "handle"
@@ -52,6 +52,6 @@ class TestPipelineStageContext:
 
 class TestSetupEnvironment:
     def test_setup(self):
-        from core.lifecycle import FusionMemoryGuardian
+        from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
         FusionMemoryGuardian._initialized = False
         FusionMemoryGuardian.setup_environment()

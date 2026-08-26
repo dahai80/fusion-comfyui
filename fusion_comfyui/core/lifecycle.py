@@ -1,9 +1,10 @@
 import gc
 import logging
-
-import mlx.core as mx
+import os
 
 logger = logging.getLogger("fusion_comfyui.core.lifecycle")
+
+_PURGE_THRESHOLD_MB = 1024
 
 
 class FusionMemoryGuardian:
@@ -13,7 +14,6 @@ class FusionMemoryGuardian:
     def setup_environment(cls):
         if cls._initialized:
             return
-        import os
         os.environ.pop("PYTORCH_MPS_HIGH_WATERMARK_RATIO", None)
         os.environ.pop("PYTORCH_ENABLE_MPS_FALLBACK", None)
         logger.info("FusionMemoryGuardian: pure MLX mode, no MPS suppression needed")
@@ -23,18 +23,46 @@ class FusionMemoryGuardian:
     def purge_memory(cls, deep_clean: bool = True):
         gc.collect()
         try:
-            mx.metal.clear_cache()
-            active = mx.metal.get_active_memory()
-            peak = mx.metal.get_peak_memory()
+            import mlx.core as mx
+            clear = getattr(mx, "clear_cache", None)
+            if clear is not None:
+                clear()
+            else:
+                mx.metal.clear_cache()
+            active_fn = getattr(mx, "get_active_memory", None) or mx.metal.get_active_memory
+            peak_fn = getattr(mx, "get_peak_memory", None) or mx.metal.get_peak_memory
+            active = active_fn()
+            peak = peak_fn()
             logger.debug(
-                "purge: active=%.1fMB peak=%.1fMB",
+                "FusionMemoryGuardian purge: active=%.1fMB peak=%.1fMB",
                 active / 1024 / 1024,
                 peak / 1024 / 1024,
             )
         except Exception as e:
-            logger.warning("mx.metal.clear_cache failed: %s", e)
+            logger.warning("FusionMemoryGuardian: clear_cache failed: %s", e)
+
         if deep_clean:
             gc.collect()
+
+    @classmethod
+    def maybe_purge(cls, threshold_mb=_PURGE_THRESHOLD_MB):
+        try:
+            import mlx.core as mx
+            active_fn = getattr(mx, "get_active_memory", None) or mx.metal.get_active_memory
+            active_mb = active_fn() / 1024 / 1024
+            if active_mb < threshold_mb:
+                logger.debug(
+                    "FusionMemoryGuardian maybe_purge: skipping, active=%.0fMB < threshold=%dMB",
+                    active_mb, threshold_mb,
+                )
+                return
+            logger.info(
+                "FusionMemoryGuardian maybe_purge: active=%.0fMB >= threshold=%dMB, purging",
+                active_mb, threshold_mb,
+            )
+        except Exception:
+            pass
+        cls.purge_memory()
 
 
 class PipelineStageContext:
@@ -44,7 +72,7 @@ class PipelineStageContext:
         self._stage_handle = None
 
     def __enter__(self):
-        FusionMemoryGuardian.purge_memory()
+        FusionMemoryGuardian.maybe_purge()
         logger.info("PipelineStage: loading '%s'", self.stage_name)
         self._stage_handle = self.model_wrapper.load_stage(self.stage_name)
         return self._stage_handle
@@ -53,5 +81,5 @@ class PipelineStageContext:
         logger.info("PipelineStage: unloading '%s'", self.stage_name)
         self.model_wrapper.unload_stage(self.stage_name)
         self._stage_handle = None
-        FusionMemoryGuardian.purge_memory()
+        FusionMemoryGuardian.maybe_purge()
         return False

@@ -19,7 +19,7 @@ class TestFusionVoiceLoaderNode:
         from nodes.voice import FusionVoiceLoaderNode
         mock_engine = MagicMock()
         with patch("nodes.voice.TTSEngine", return_value=mock_engine, create=True), \
-             patch("core.lifecycle.FusionMemoryGuardian.purge_memory"):
+             patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.purge_memory"):
             node = FusionVoiceLoaderNode()
             result = node.load("mlx-community/kokoro-82m")
             assert len(result) == 1

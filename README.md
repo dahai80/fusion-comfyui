@@ -53,36 +53,24 @@ The `ComfyUI/custom_nodes/ComfyUI-Fusion-MLX/` plugin overrides selected native 
 ## Project Structure
 
 ```
-fusion_comfyui/          # Phase 2+ standalone server
-├── core/
+fusion_comfyui/          # unified core (P1: single source of truth)
+├── core/                # the ONE core — imported by plugin via pip install -e
 │   ├── config.py        # Phase 3 config + RadixCache (radix tree)
-│   ├── engine_wrapper.py # fusion-mlx in-process wrapper
+│   ├── engine_wrapper.py # fusion-mlx in-process wrapper (API-fresh, public_api imports)
 │   ├── lifecycle.py     # Memory guardian + pipeline stage context
+│   ├── bridge.py        # torch↔mlx array bridge (numpy-mediated, P2 target)
+│   ├── wrappers.py      # FusionModelWrapper + model-path resolution
+│   ├── async_utils.py   # cross-thread materialization helpers
+│   ├── timer.py         # NodeTimer (drama pipeline instrumentation)
 │   └── output_store.py  # File-based output store for /view endpoint
-├── dag/
-│   ├── executor.py      # Topological sort + sequential execution
-│   └── types.py         # NodeDef, LinkDef, Workflow, KNOWN_TYPES
-├── nodes/
-│   ├── base.py          # BaseNode abstract class
-│   └── registry.py      # All pure MLX node implementations (Phase 2 + 3)
-├── server/
-│   ├── app.py           # FastAPI app + route mounting
-│   ├── protocol.py      # ComfyUI protocol endpoints
-│   ├── ws.py            # WebSocket progress streaming
-│   └── static_files.py  # Output + frontend static file serving
-└── main.py              # CLI entry point
+└── nodes/
+    ├── base.py          # BaseNode abstract class (drama nodes subclass this)
+    └── drama/           # drama pipeline nodes (tts, lipsync, pulid, assemble, vlm)
 
-ComfyUI/custom_nodes/ComfyUI-Fusion-MLX/  # Phase 1 custom nodes
-├── core/
-│   ├── bridge.py        # torch↔mlx array bridge (Phase 1 only; numpy-mediated, not zero-copy)
-│   ├── lifecycle.py     # FusionMemoryGuardian + PipelineStageContext
-│   └── engine_wrapper.py # fusion-mlx wrapper (torch-compatible)
-├── nodes/
-│   ├── loaders.py       # FusionModelLoaderNode
-│   ├── conditioning.py  # FusionTextEncoderNode
-│   ├── samplers.py      # FusionKSamplerNode
-│   └── vae.py           # FusionVAEDecoderNode
-└── __init__.py
+ComfyUI/custom_nodes/ComfyUI-Fusion-MLX → fusion_comfyui_plugin/  # symlinked custom node
+├── __init__.py          # NODE_CLASS_MAPPINGS + native overrides (no sys.path hack)
+├── nodes/               # 15 node modules — all import fusion_comfyui.core.X
+└── tests/               # 415 unit tests (GPU-free, mocked)
 
 FusionComfyUI/           # Phase 4 macOS native app (Swift)
 ├── FusionComfyUIApp.swift  # App entry + ContentView
@@ -91,6 +79,9 @@ FusionComfyUI/           # Phase 4 macOS native app (Swift)
 ├── ModelManager.swift      # Model discovery + download
 └── Package.swift
 ```
+
+> **P1 unification (v0.2.13):** the dormant standalone FastAPI server (`fusion_comfyui/server/`, `dag/`, `main.py`, `nodes/registry.py`, `frontend/`) was removed — ComfyUI's own orchestration is the sole runtime. The plugin's private `core/` was folded into the single `fusion_comfyui/core/`; the plugin now imports it as an installed package (`pip install -e .`), no `sys.path` hack. The `fusion-comfyui` console script and the `fastapi`/`uvicorn`/`websockets` deps were dropped (server-only).
+
 
 ## Dependencies & Netlayer
 
@@ -145,64 +136,35 @@ FUSION_NVFP4_ENABLED=1
 FUSION_NVFP4_THRESHOLD_GB=8
 ```
 
-Denoise stats are queryable at runtime: the `FusionDenoiseStats` node (both
-Phase 1 custom nodes and Phase 2 registry) returns the last denoise run's
-acceptance/speedup counters as JSON, and fusion-mlx exposes
-`GET /v1/videos/denoise-stats?model=<name>`.
+Denoise stats are queryable at runtime: the `FusionDenoiseStats` node (in the
+plugin `nodes/stats.py`) returns the last denoise run's acceptance/speedup
+counters as JSON, and fusion-mlx exposes `GET /v1/videos/denoise-stats?model=<name>`.
 
 ## Reliability / Production Hardening
 
-The Phase 2 standalone server was acceptance-verified against production
-release standard. Ten correctness bugs were found by static + live probe and
-fixed (all in this repo, no upstream changes needed):
-
-- **Frontend default resolution** (`static_files.py:get_frontend_dir`) — an empty
-  `FUSION_FRONTEND_DIR` resolved to `Path(".")` (cwd) instead of the bundled
-  frontend, so `GET /` returned 404. Now guarded; the bundled frontend is served
-  by default. Override with `FUSION_FRONTEND_DIR=/abs/path`.
-- **`/view` path traversal** (`static_files.py:view_file`) — `filename`/`subfolder`
-  are now resolved and confined to the output dir; `../` escapes return 404.
-- **DAG cycle detection** (`dag/types.py:topo_order`) — a cycle previously logged
-  and silently skipped the nodes, returning an incomplete order. It now raises
-  `ValueError`, surfaced as a workflow `error` status (fail visibly).
-- **Unresolved link** (`dag/executor.py:_resolve_inputs`) — a link whose source
-  had not executed was passed raw to the node, corrupting it silently. It now
-  raises and aborts the workflow with an `error` status.
-- **Queue state machine** (`server/protocol.py` + `server/app.py`) — prompts were
-  marked `running` immediately, so `queue_pending` was always empty. They now
-  start `queued` and flip to `running` when execution begins, so `GET /queue`
-  reflects the real queue.
-- **WebSocket event protocol** (`server/app.py` + `dag/executor.py`) — the server
-  emitted a non-standard `execution_success` event and never sent the upstream
-  `executing`/`executed` events that the ComfyUI frontend relies on for node
-  highlight and output preview. `node_event_cb` now emits `executing` before each
-  node and `executed` after, and prompt completion sends `executing:{node:None}`
-  (the upstream `main.py` convention) instead of `execution_success`.
+The runtime was acceptance-verified against production release standard.
+Correctness bugs found by static + live probe and fixed (all in this repo, no
+upstream changes needed):
 - **Video model routing** (`core/engine_wrapper.py`) — `hunyuan`/`cosmos`/`svd`
   were absent from `_MODEL_TYPES`, so they fell back to `image` and loaded the
-  wrong engine with a 4-channel latent. They now route to `video` (matching the
-  Phase 1 plugin wrapper) with correct latent channels (hunyuan/cosmos 16, svd 4).
+  wrong engine with a 4-channel latent. They now route to `video` with correct
+  latent channels (hunyuan/cosmos 16, svd 4).
 - **bridge.py label** — the `torch↔mlx` bridge was described as "zero-copy"; it is
   numpy-mediated (torch→numpy→mlx), so the README label was corrected.
-- **WebSocket 403 on connect** (`server/app.py`) — the `/ws` endpoint declared its
-  first parameter as bare `ws` with no `WebSocket` annotation, so FastAPI 0.139.2
-  parsed `ws` as a required *query* parameter. With no `?ws=...` in the request
-  the handshake failed validation and uvicorn returned HTTP 403 before `accept()`,
-  breaking every WS client (frontend and programmatic). Annotating `ws: WebSocket`
-  restores the injected connection; verified live (connect → `status` → ping/pong).
-- **`/history` schema** (`server/protocol.py`) — records returned `status` as a
-  bare string (`"ok"`/`"error"`), but the upstream ComfyUI `/history` contract (and
-  the frontend) expect `status` to be an object `{status_str, completed, messages}`.
-  Clients calling `.get("status_str")` on the string raised `AttributeError`. The
-  records are now projected to the upstream shape (`status_str` `success`/`error`,
-  `completed` flag, `messages` from `errors`), so `/history` is client-compatible.
 
-Covered by new tests in `tests/test_dag_types.py`, `tests/test_dag_executor.py`,
-`tests/test_server_static_files.py`, `tests/test_server_protocol.py`,
-`tests/test_server_ws.py`, and `tests/test_engine_wrapper_routing.py`
-(499 unit passing; 8 e2e skip unless a Phase-1 plugin node server is running).
-A separate upstream frontend concern (stable DOM `data-testid` selectors for UI
-testing) is tracked in issue
+> **Historical note:** the earlier v0.2.x standalone FastAPI server also carried
+> fixes for DAG cycle/unresolved-link detection, a queue state machine, the
+> WebSocket event protocol, a `/ws` 403-on-connect annotation bug, and a
+> `/history` schema projection. That dormant server was removed in the P1
+> unification (v0.2.13) — ComfyUI's own `server.py`/`execution.py` now own those
+> concerns — so those fixes are no longer in this repo. The video-routing and
+> bridge-label fixes above live in the unified `core/` and remain.
+
+Covered by tests in `tests/test_engine_wrapper_routing.py`,
+`tests/test_engine_wrapper_h3_routing.py`, and the plugin suite
+`fusion_comfyui_plugin/tests/` (485 unit passing; e2e tests skip unless
+`RUN_E2E=1` with a live ComfyUI server). A separate upstream frontend concern
+(stable DOM `data-testid` selectors for UI testing) is tracked in issue
 [Comfy-Org/ComfyUI#15392](https://github.com/Comfy-Org/ComfyUI/issues/15392).
 
 ## Upstream Dependencies

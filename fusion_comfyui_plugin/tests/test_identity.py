@@ -23,7 +23,7 @@ class TestFusionIdentityLoader:
         with patch.object(
             FusionIdentityLoader, "_load_pipeline",
             new_callable=AsyncMock, return_value=mock_pipeline,
-        ), patch("core.lifecycle.FusionMemoryGuardian.purge_memory"):
+        ), patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.purge_memory"):
             node = FusionIdentityLoader()
             result = node.load_identity("pulid_flux_v0.9.1", "float16")
         assert len(result) == 1
@@ -100,7 +100,7 @@ class TestFusionIdentityGenerate:
         with patch.object(
             FusionIdentityGenerate, "_generate_with_identity",
             new_callable=AsyncMock, return_value=fake_bytes,
-        ), patch("core.lifecycle.FusionMemoryGuardian.purge_memory"):
+        ), patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.purge_memory"):
             node = FusionIdentityGenerate()
             ref_image = np.random.rand(1, 256, 256, 3).astype(np.float32)
             result = node.generate(
@@ -118,7 +118,7 @@ class TestFusionIdentityGenerate:
         mock_identity = MagicMock()
         mock_identity.extract_id_embedding.return_value = None
         ref_image = np.random.rand(1, 64, 64, 3).astype(np.float32)
-        with patch("core.lifecycle.FusionMemoryGuardian.purge_memory"):
+        with patch("fusion_comfyui.core.lifecycle.FusionMemoryGuardian.purge_memory"):
             node = FusionIdentityGenerate()
             with pytest.raises(RuntimeError, match="No face"):
                 node.generate(

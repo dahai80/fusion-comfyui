@@ -25,6 +25,16 @@ COMFYUI_URL = f"http://127.0.0.1:{_E2E_PORT}"
 POLL_INTERVAL = 5
 MAX_POLL_SECONDS = 3600
 
+# Integration tests hit a live ComfyUI server + real models. Only run when
+# explicitly opted in via RUN_E2E=1; otherwise skip cleanly so the unit-test
+# suite stays fast and GPU-free. Matches the env-gate pattern in
+# test_e2e_wan2_staged.py.
+pytestmark = pytest.mark.skipif(
+    os.environ.get("RUN_E2E", "").strip().lower() not in ("1", "true", "yes"),
+    reason="e2e integration test; set RUN_E2E=1 with a live ComfyUI on port "
+    f"{_E2E_PORT} to enable",
+)
+
 
 def _api_get(path):
     url = f"{COMFYUI_URL}{path}"

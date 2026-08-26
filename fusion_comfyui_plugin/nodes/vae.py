@@ -3,7 +3,7 @@ import logging
 import mlx.core as mx
 import numpy as np
 
-import core.async_utils
+import fusion_comfyui.core.async_utils
 
 logger = logging.getLogger("fusion_comfyui.nodes.vae")
 
@@ -22,9 +22,9 @@ class VAEDecode:
     CATEGORY = "model/latent"
 
     def decode(self, vae, samples):
-        from core.wrappers import FusionVAEWrapper
-        from core.bridge import to_mlx_array, to_image_tensor
-        from core.lifecycle import FusionMemoryGuardian
+        from fusion_comfyui.core.wrappers import FusionVAEWrapper
+        from fusion_comfyui.core.bridge import to_mlx_array, to_image_tensor
+        from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
 
         FusionMemoryGuardian.maybe_purge()
 
@@ -83,7 +83,7 @@ class VAEDecode:
 
         engine = vae.get_engine()
         try:
-            decoded = core.async_utils.run_async(
+            decoded = fusion_comfyui.core.async_utils.run_async(
                 self._decode_via_engine(engine, mlx_latent),
                 timeout=300,
             )
@@ -132,9 +132,9 @@ class VAEDecodeTiled:
     CATEGORY = "model/latent"
 
     def decode(self, vae, samples, tile_size=512, overlap=64, temporal_size=64, temporal_overlap=8):
-        from core.wrappers import FusionVAEWrapper
-        from core.bridge import to_mlx_array, to_image_tensor
-        from core.lifecycle import FusionMemoryGuardian
+        from fusion_comfyui.core.wrappers import FusionVAEWrapper
+        from fusion_comfyui.core.bridge import to_mlx_array, to_image_tensor
+        from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
 
         FusionMemoryGuardian.maybe_purge()
 
@@ -155,7 +155,7 @@ class VAEDecodeTiled:
 
         engine = vae.get_engine()
         try:
-            decoded = core.async_utils.run_async(
+            decoded = fusion_comfyui.core.async_utils.run_async(
                 self._decode_tiled_via_engine(engine, mlx_latent, tile_size),
                 timeout=600,
             )
@@ -202,8 +202,8 @@ class FusionVAEDecoderNode:
     CATEGORY = "Fusion-MLX/VAE"
 
     def decode(self, pipeline, latent, tile_sample_min_size=256):
-        from core.bridge import to_mlx_array, to_image_tensor
-        from core.lifecycle import FusionMemoryGuardian
+        from fusion_comfyui.core.bridge import to_mlx_array, to_image_tensor
+        from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
 
         FusionMemoryGuardian.maybe_purge()
         logger.info("FusionVAEDecoder: tile_size=%d", tile_sample_min_size)
@@ -212,7 +212,7 @@ class FusionVAEDecoderNode:
         mlx_latent = to_mlx_array(raw_samples)
 
         try:
-            decoded_mlx = core.async_utils.run_async(
+            decoded_mlx = fusion_comfyui.core.async_utils.run_async(
                 self._decode_staged(pipeline, mlx_latent, tile_sample_min_size),
                 timeout=300,
             )

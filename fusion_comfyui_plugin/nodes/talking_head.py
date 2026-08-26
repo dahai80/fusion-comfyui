@@ -91,8 +91,8 @@ class FusionLipsyncLoader:
     CATEGORY = "Fusion-MLX/Talking-Head"
 
     def load_lipsync(self, model_name, dtype="float16"):
-        import core.async_utils
-        from core.lifecycle import FusionMemoryGuardian
+        import fusion_comfyui.core.async_utils
+        from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
 
         FusionMemoryGuardian.maybe_purge()
         model_path = _resolve_latentsync_path(model_name)
@@ -102,7 +102,7 @@ class FusionLipsyncLoader:
         mx_dtype = dtype_map.get(dtype, "float16")
 
         try:
-            pipeline = core.async_utils.run_async(
+            pipeline = fusion_comfyui.core.async_utils.run_async(
                 self._load_pipeline(model_path, mx_dtype),
                 timeout=120,
             )
@@ -149,7 +149,7 @@ class FusionLipsyncApply:
     def apply_lipsync(self, lipsync_model, video_path, audio_path,
                       audio=None, output_fps=25, num_inference_steps=20,
                       guidance_scale=1.0, seed=42):
-        from core.lifecycle import FusionMemoryGuardian
+        from fusion_comfyui.core.lifecycle import FusionMemoryGuardian
 
         FusionMemoryGuardian.maybe_purge()
 
@@ -167,11 +167,11 @@ class FusionLipsyncApply:
             video_path, audio_path, output_fps, num_inference_steps, seed,
         )
 
-        import core.async_utils
+        import fusion_comfyui.core.async_utils
 
         output_path = None
         try:
-            output_path = core.async_utils.run_async(
+            output_path = fusion_comfyui.core.async_utils.run_async(
                 self._run_lipsync(
                     lipsync_model, video_path, audio_path,
                     output_fps, num_inference_steps, guidance_scale, seed,

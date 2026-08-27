@@ -324,36 +324,43 @@ class FusionImageToVideoNode:
         image_input = control_image
         tmp_path = None
         if isinstance(control_image, Image.Image):
-            tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+            # fusion-mlx minimax_h3 backend validates condition-image paths
+            # against an allowed-dirs list (~/.fusion-mlx/models, /tmp,
+            # /var/tmp). macOS default tempfile ($TMPDIR = /var/folders/.../T)
+            # is NOT in that list -> "condition image outside allowed dirs".
+            # Write under /tmp explicitly so i2va/l2va pass the safety check.
+            tmp = tempfile.NamedTemporaryFile(
+                suffix=".png", delete=False, prefix="fusion_i2v_", dir="/tmp"
+            )
             try:
                 control_image.save(tmp, format="PNG")
                 tmp.close()
                 tmp_path = tmp.name
                 image_input = tmp_path
-                logger.info("_generate_i2v: saved PIL Image to temp file %s", tmp_path)
+                logger.info("_generate_i2v: saved PIL Image to /tmp (allowed-dirs) %s", tmp_path)
             except Exception:
                 tmp.close()
                 os.unlink(tmp.name)
                 raise
         try:
-            result_raw = await pipeline._engine.generate(
-                prompt=prompt, num_frames=num_frames, width=width, height=height,
-                fps=fps, seed=seed, n=1, num_inference_steps=steps,
-                cfg_scale=cfg, negative_prompt=neg,
-                image=image_input, output_format="raw",
-                quantize=quantize,
-            )
-            if isinstance(result_raw[0], np.ndarray):
-                logger.info("_generate_i2v: raw frames shape=%s", result_raw[0].shape)
+            try:
+                result_raw = await pipeline._engine.generate(
+                    prompt=prompt, num_frames=num_frames, width=width, height=height,
+                    fps=fps, seed=seed, n=1, num_inference_steps=steps,
+                    cfg_scale=cfg, negative_prompt=neg,
+                    image=image_input, output_format="raw",
+                    quantize=quantize,
+                )
+                if isinstance(result_raw[0], np.ndarray):
+                    logger.info("_generate_i2v: raw frames shape=%s", result_raw[0].shape)
+                    return result_raw
+                logger.info(
+                    "_generate_i2v: raw not returned (got %s), using as mp4",
+                    type(result_raw[0]).__name__,
+                )
                 return result_raw
-            logger.info(
-                "_generate_i2v: raw not returned (got %s), using as mp4",
-                type(result_raw[0]).__name__,
-            )
-            return result_raw
-        except (TypeError, AttributeError) as e:
-            logger.info("_generate_i2v: raw not supported, falling back to mp4: %s", e)
-        try:
+            except (TypeError, AttributeError) as e:
+                logger.info("_generate_i2v: raw not supported, falling back to mp4: %s", e)
             result_bytes = await pipeline._engine.generate(
                 prompt=prompt, num_frames=num_frames, width=width, height=height,
                 fps=fps, seed=seed, n=1, num_inference_steps=steps,
@@ -366,6 +373,7 @@ class FusionImageToVideoNode:
             if tmp_path:
                 try:
                     os.unlink(tmp_path)
+                    logger.info("_generate_i2v: cleaned temp %s", tmp_path)
                 except OSError:
                     pass
 

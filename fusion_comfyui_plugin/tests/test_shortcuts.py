@@ -154,3 +154,57 @@ class TestFusionImageToVideoNode:
         from nodes.shortcuts import FusionImageToVideoNode
         inputs = FusionImageToVideoNode.INPUT_TYPES()
         assert "required" in inputs
+
+    def test_generate_i2v_raw_path_cleans_temp_png(self):
+        from nodes.shortcuts import FusionImageToVideoNode
+        from PIL import Image
+        import os
+        node = FusionImageToVideoNode()
+        control = Image.new("RGB", (32, 32), color="blue")
+        pipeline = MagicMock()
+        pipeline.ensure_started = AsyncMock()
+        captured = {}
+
+        async def fake_generate(**kwargs):
+            p = kwargs.get("image")
+            captured["image_path"] = p
+            assert p is not None and p.startswith("/tmp/fusion_i2v_"), p
+            assert os.path.exists(p), f"temp png missing during generate: {p}"
+            return [np.zeros((2, 32, 32, 3), dtype=np.uint8)]
+
+        pipeline._engine.generate = fake_generate
+        result = _run_async_hack(node._generate_i2v(
+            pipeline, control, "prompt", "", 64, 64, 4, 24, 2, 5.0, 42, "none"))
+        assert isinstance(result[0], np.ndarray)
+        assert not os.path.exists(captured["image_path"]), \
+            f"temp png not cleaned: {captured['image_path']}"
+
+    def test_generate_i2v_mp4_path_cleans_temp_png(self):
+        from nodes.shortcuts import FusionImageToVideoNode
+        from PIL import Image
+        import os
+        node = FusionImageToVideoNode()
+        control = Image.new("RGB", (32, 32), color="blue")
+        pipeline = MagicMock()
+        pipeline.ensure_started = AsyncMock()
+        captured = {}
+
+        call_count = {"n": 0}
+
+        async def fake_generate(**kwargs):
+            call_count["n"] += 1
+            p = kwargs.get("image")
+            captured["image_path"] = p
+            assert p is not None and p.startswith("/tmp/fusion_i2v_"), p
+            assert os.path.exists(p), f"temp png missing during generate: {p}"
+            if call_count["n"] == 1:
+                raise TypeError("raw not supported")
+            return [b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 50]
+
+        pipeline._engine.generate = fake_generate
+        result = _run_async_hack(node._generate_i2v(
+            pipeline, control, "prompt", "", 64, 64, 4, 24, 2, 5.0, 42, "none"))
+        assert isinstance(result[0], (bytes, bytearray))
+        assert call_count["n"] == 2
+        assert not os.path.exists(captured["image_path"]), \
+            f"temp png not cleaned: {captured['image_path']}"

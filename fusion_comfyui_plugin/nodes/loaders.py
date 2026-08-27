@@ -22,6 +22,7 @@ _KNOWN_DIFFUSION_MODELS = [
     "skyreels_v3_a2v_19b_mlx.safetensors",
     "skyreels_v3_r2v_14b_mlx.safetensors",
     "skyreels_v3_v2v_14b_mlx.safetensors",
+    "minimax-h3/FL2VA",
 ]
 
 _KNOWN_TEXT_ENCODERS = [

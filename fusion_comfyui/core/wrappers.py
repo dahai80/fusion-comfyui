@@ -164,7 +164,7 @@ class FusionConditioning:
 
 def _infer_model_type(model_name: str) -> str:
     name = model_name.lower()
-    if any(k in name for k in ("wan", "ltx", "skyreels", "cosmos", "hunyuan", "svd", "stable-video", "img2vid")):
+    if any(k in name for k in ("wan", "ltx", "skyreels", "cosmos", "hunyuan", "svd", "stable-video", "img2vid", "minimax", "h3", "fl2va", "ref2va")):
         return "video"
     return "image"
 
@@ -478,6 +478,9 @@ def _map_unet_name_to_model_name(unet_name: str) -> str:
         if "v2v" in name:
             return _fallback_model("SkyReels-V3-V2V-14B-MLX")
         return _fallback_model("SkyReels-V3-V2V-14B-MLX")
+    if "minimax" in name or "h3" in name or "fl2va" in name or "ref2va" in name:
+        logger.info("Map minimax-H3 unet %s -> minimax-h3/FL2VA", unet_name)
+        return "minimax-h3/FL2VA"
     if "flux" in name:
         if "4b" in name or "base-4" in name:
             return "FLUX.2-klein-base-4B"

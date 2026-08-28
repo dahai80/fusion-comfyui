@@ -12,6 +12,9 @@
 
 - 4-space-multiple indent, no docstrings, default logging on every node
 - Only modify `/Users/dahai/fusion/fusion-comfyui` (own project). Upstream fusion-mlx gaps filed as issues first, then PR.
+- **H3 latent dims (verified `config.py` H3VAEConfig + `generate.py` `_latents_shape`): z_channels=24, spatial ÷16 (vae_ratio=16), temporal ÷4 causal (vae_ratio_t=4).** Latent shape `(1, 24, t, h//16, w//16)` where `t=(length-1)//4+1`. NOT 16 channels / ÷8.
+- **H3 audio+image mutually exclusive** (`generate_video` raises): fl2va (i2va/l2va/keyframe) is video-only, only t2va (no image) may set `audio=True`. Conditioning nodes force `_h3_audio=False` when an image/last_frame is set.
+- **H3 ref2va not wired upstream**: `MiniMaxH3Backend.generate()` does not forward `reference_images` to `generate_video()` (no ref2va branch). h3-r2v e2e is BLOCKED until fusion-mlx issue+PR. `_h3_ref_images` is staged by `MiniMaxH3ReferenceToVideo` but dropped at engine layer.
 - fusion-mlx `VideoGenEngine.generate` missing `last_frame_image` forwarding — upstream fix needed (issue + PR)
 - Real model load for any H3 test (33B minimax_h3), start/stop via `~/claude-home/fusion-mlx/start.sh start|stop`, download via `https://hf-mirror.com`
 - Clean process data after verification, keep only final outputs + logs
@@ -132,7 +135,7 @@ class MiniMaxH3SigmaShift:
 
 ### 2. `EmptyMiniMaxH3LatentAV`
 
-Returns LATENT dict with dims. H3 video VAE downsamples spatial 8x, temporal 4x (causal). Audio latent is separate in native flow but MLX bakes audio — so this just carries the video latent dims + the `_h3_audio=True` flag.
+Returns LATENT dict with dims. H3 video VAE downsamples spatial 16x (vae_ratio=16), temporal 4x causal (vae_ratio_t=4), z_channels=24 (verified `config.py` H3VAEConfig + `generate.py` `_latents_shape`). Audio latent is separate in native flow but MLX bakes audio — so this just carries the video latent dims + the `_h3_audio=True` flag.
 
 ```python
 class EmptyMiniMaxH3LatentAV:
@@ -151,8 +154,11 @@ class EmptyMiniMaxH3LatentAV:
     CATEGORY = "Fusion-MLX/H3"
 
     def generate(self, width=960, height=544, length=73, batch_size=1):
+        # H3 video VAE: z_channels=24, spatial /16 (vae_ratio), temporal /4 causal (vae_ratio_t).
+        # Verified in fusion_mlx/video/minimax_h3/config.py H3VAEConfig + generate.py _latents_shape.
+        # t_latent=(length-1)//4+1. shape=(1, 24, t, h//16, w//16).
         t_latent = (length - 1) // 4 + 1
-        latent = mx.zeros((batch_size, 16, t_latent, height // 8, width // 8), dtype=mx.float32)
+        latent = mx.zeros((batch_size, 24, t_latent, height // 16, width // 16), dtype=mx.float32)
         logger.info("EmptyMiniMaxH3LatentAV: shape=%s %dx%d frames=%d", latent.shape, width, height, length)
         return ({"samples": latent, "num_frames": length, "width": width, "height": height, "_h3_audio": True},)
 ```
@@ -187,8 +193,11 @@ class MiniMaxH3ImageToVideo:
 
     def generate(self, clip, vae, prompt="", width=960, height=544, length=73,
                  first_frame=None, last_frame=None, quantize="dit8_te4"):
+        # H3 latent: z_channels=24, spatial /16, temporal /4. See EmptyMiniMaxH3LatentAV.
+        # audio forced False: fl2va (image/last_frame) is video-only, audio+image mutually
+        # exclusive (generate_video raises). Only t2va (no image) may set _h3_audio=True.
         t_latent = (length - 1) // 4 + 1
-        latent = mx.zeros((1, 16, t_latent, height // 8, width // 8), dtype=mx.float32)
+        latent = mx.zeros((1, 24, t_latent, height // 16, width // 16), dtype=mx.float32)
         result = {"samples": latent, "num_frames": length, "width": width, "height": height,
                   "_h3_audio": False, "_h3_quantize": quantize}
         if first_frame is not None:
@@ -246,8 +255,13 @@ class MiniMaxH3ReferenceToVideo:
 
     def generate(self, clip, vae, prompt="", width=960, height=544, length=73,
                  ref_image_size="match", audio_vae=None, ref_images=None, quantize="dit8_te4"):
+        # H3 latent: z_channels=24, spatial /16, temporal /4. See EmptyMiniMaxH3LatentAV.
+        # UPSTREAM GAP: MiniMaxH3Backend.generate() does NOT forward reference_images to
+        # generate_video() — generate_video has no ref2va branch (only image/last_frame_image
+        # keyframe fl2va path). _h3_ref_images is staged here but will be dropped at the engine
+        # layer until fusion-mlx adds a ref2va branch (issue→PR→dep bump). h3-r2v e2e is BLOCKED.
         t_latent = (length - 1) // 4 + 1
-        latent = mx.zeros((1, 16, t_latent, height // 8, width // 8), dtype=mx.float32)
+        latent = mx.zeros((1, 24, t_latent, height // 16, width // 16), dtype=mx.float32)
         result = {"samples": latent, "num_frames": length, "width": width, "height": height,
                   "_h3_audio": False, "_h3_quantize": quantize}
         if ref_images is not None:
@@ -479,12 +493,25 @@ class ComfyMathExpression:
 
 **Local gate until merged:** `_generate_monolithic` sends `gen_kwargs["last_frame_image"]` regardless. If the installed fusion-mlx ignores it, behavior degrades to video-only-i2v (logged). No local code change needed to match the upstream — the kwarg is simply dropped upstream.
 
+### Upstream Gap #2 — ref2va (reference_images) not wired
+
+**`MiniMaxH3Backend.generate()` does not forward `reference_images` to `generate_video()`.** `VideoGenParams.reference_images` (base.py) is set from kwargs and `VideoGenEngine.generate` forwards it, but `MiniMaxH3Backend.generate` (minimax_h3.py ~line 124-202) constructs the `generate_video(...)` call with only `image`/`last_frame_image` — there is **no `reference_images=` argument and no ref2va branch** in `generate_video` (generate.py:645-746). `reference_audio` is explicitly rejected with `ValueError` (issue #589). `H3Partition.REF2VA` exists in config + backend `__init__` (path hint: model path containing `ref2va` auto-switches partition), but `generate()` is partition-agnostic at the call site — ref2va partition is scaffolding-only.
+
+**Impact:** AICF h3-r2v (multi-reference-to-video) **cannot run** — `_h3_ref_images` staged by `MiniMaxH3ReferenceToVideo` reaches `_generate_monolithic` → `gen_kwargs["reference_images"]` → `engine._engine.generate(reference_images=...)` → `VideoGenParams.reference_images` set → `MiniMaxH3Backend.generate` **drops it** → `generate_video` runs t2va (no image/last_frame) ignoring refs. Output is a t2v video, not a ref-conditioned video.
+
+**Process (project rule: 先提issue，再提PR，跟着提交落地code):**
+1. File fusion-mlx issue: `MiniMaxH3Backend.generate drops reference_images — ref2va partition not wired to generate_video`. Cite minimax_h3.py generate() call + generate.py:645-746 (no ref2va branch) + config.py `H3Partition.REF2VA`.
+2. Open fusion-mlx PR: add a ref2va branch in `generate_video` (new `generate_ref2va_video` or extend `generate_fl2va_video` with multi-ref conditioning) + forward `reference_images` in `MiniMaxH3Backend.generate`.
+3. Land in fusion-comfyui: bump dep floor once published; flip `test_h3_r2v_e2e` from xfail to pass.
+
+**Local gate until merged:** `MiniMaxH3ReferenceToVideo` still stages `_h3_ref_images` + `_generate_monolithic` still forwards `reference_images` so no local change is needed post-merge — the kwarg simply becomes effective once the engine consumes it. h3-r2v e2e stays `xfail(strict=True)` until then.
+
 ## Testing Plan
 
 ### Unit tests (no model load) — `tests/test_h3_nodes.py`
 
 1. `test_minimax_h3_sigma_shift_passthrough` — node returns model unchanged, logs shift values.
-2. `test_empty_h3_latent_av_shape` — `EmptyMiniMaxH3LatentAV(width=960,height=544,length=73)` → latent shape `(1,16,19,68,120)`, `_h3_audio=True`.
+2. `test_empty_h3_latent_av_shape` — `EmptyMiniMaxH3LatentAV(width=960,height=544,length=73)` → latent shape `(1,24,19,34,60)` (z_channels=24, h//16=34, w//16=60, t=(73-1)//4+1=19), `_h3_audio=True`.
 3. `test_h3_image_to_video_conditioning_dict` — returns 2-tuple; out 0 is `{"prompt": ...}`; out 1 has `_h3_quantize`, `_h3_audio=False`, no `_h3_first_frame_path` when first_frame=None.
 4. `test_h3_image_to_video_first_frame_temp_path` — pass a fake IMAGE (np zeros `(1,64,64,3)`), assert `_h3_first_frame_path` is a `/tmp/...png` that exists on disk.
 5. `test_h3_reference_to_video_ref_images_dict` — pass `ref_images={"ref_image_1": <img>}`, assert `_h3_ref_images` is a 1-element list of existing png paths.
@@ -500,8 +527,8 @@ class ComfyMathExpression:
 **Setup:** `~/claude-home/fusion-mlx/start.sh start`; confirm 33B `minimax_h3_fl2va_pruned_nvfp4` present (download via `https://hf-mirror.com` if missing — see [[h3-drama-pipeline-landing]]).
 
 1. `test_h3_t2v_e2e` — load h3-t2v.json, set prompt, POST /prompt, poll /history, assert output mp4 exists, `ffprobe` shows video stream + audio stream (audio baked), duration ~3s (73 frames @ 24fps). **Quality gate:** `ffmpeg -i out.mp4 -filter:v psnr` against a baseline OR `mean_volume -18dB` range (per [[h3-drama-pipeline-landing]] F1 verification).
-2. `test_h3_i2v_e2e` — h3-i2v.json with first_frame only (last_frame gated on upstream PR), assert mp4 with video+audio, frames show the first_frame content in frame 0 (pixel sample matches input image within tolerance).
-3. `test_h3_r2v_e2e` — h3-r2v.json with ref_image, assert mp4 generated, ref identity preserved (correlation ≥0.5 frame0 vs ref — r2v is loose).
+2. `test_h3_i2v_e2e` — h3-i2v.json with first_frame only (last_frame gated on upstream PR), assert mp4 with **video stream only** (fl2va keyframe is video-only; audio+image are mutually exclusive in `generate_video`, no audio baked), frames show the first_frame content in frame 0 (pixel sample matches input image within tolerance).
+3. `test_h3_r2v_e2e` — **BLOCKED upstream**: `MiniMaxH3Backend.generate()` does not forward `reference_images` to `generate_video()` (no ref2va branch). `pytest.mark.xfail(strict=True, reason="fusion-mlx ref2va not wired — issue→PR→dep bump")`. Re-enable once fusion-mlx PR lands + dep floor bumped. Until then `_h3_ref_images` is staged by the node but dropped at engine layer.
 
 **Cleanup (project rule):** after each e2e, delete temp pngs (`/tmp/fusion_h3_*`), keep only the final mp4 + the test log. `~/claude-home/fusion-mlx/start.sh stop` at suite end.
 
@@ -540,4 +567,5 @@ After registration, start ComfyUI, hit `/object_info` — assert all 10 new node
 **Out of scope (separate problems):**
 - AICF Qwen2.5 image-edit nodes (UnetLoaderGGUF/FluxKontext*) — MLX-unsupported, not H3.
 - AICF `last_frame` full e2e with upstream fix — gated, tested after PR lands.
-- ref2va `reference_audio` — fusion-mlx issue #589 still open (not implemented upstream); r2v uses ref IMAGES only, which works.
+- ref2va `reference_audio` — fusion-mlx issue #589 still open (not implemented upstream).
+- ref2va ref IMAGES — **also upstream-blocked** (see Upstream Gap #2): `MiniMaxH3Backend.generate` does not forward `reference_images`, so h3-r2v with ref images is NOT runnable today despite the node staging them. Node + forwarding code land now (degrades to t2va); e2e flips from xfail to pass once fusion-mlx PR lands.

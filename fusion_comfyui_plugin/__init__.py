@@ -132,6 +132,18 @@ from .nodes.ip_adapter import (
     FusionIPAdapterInject,
 )
 from .nodes.stats import FusionDenoiseStatsNode
+from .nodes.h3 import (
+    MiniMaxH3SigmaShift,
+    EmptyMiniMaxH3LatentAV,
+    MiniMaxH3ImageToVideo,
+    MiniMaxH3ReferenceToVideo,
+    VAEDecodeAudio as H3VAEDecodeAudio,
+    CreateVideo as H3CreateVideo,
+    SaveVideo as H3SaveVideo,
+    ImageScaleToTotalPixels as H3ImageScaleToTotalPixels,
+    PrimitiveFloat as H3PrimitiveFloat,
+    ComfyMathExpression as H3ComfyMathExpression,
+)
 
 FusionMemoryGuardian.setup_environment()
 logger.info("ComfyUI-Fusion-MLX: memory guardian initialized")
@@ -250,6 +262,17 @@ NODE_CLASS_MAPPINGS = {
     "FusionIPAdapterInject": FusionIPAdapterInject,
     # Debug
     "FusionDenoiseStats": FusionDenoiseStatsNode,
+    # H3 (MiniMax H3) sampling-pipe nodes for AICF workflows (h3-t2v/i2v/r2v)
+    "MiniMaxH3SigmaShift": MiniMaxH3SigmaShift,
+    "EmptyMiniMaxH3LatentAV": EmptyMiniMaxH3LatentAV,
+    "MiniMaxH3ImageToVideo": MiniMaxH3ImageToVideo,
+    "MiniMaxH3ReferenceToVideo": MiniMaxH3ReferenceToVideo,
+    "VAEDecodeAudio": H3VAEDecodeAudio,
+    "CreateVideo": H3CreateVideo,
+    "SaveVideo": H3SaveVideo,
+    "ImageScaleToTotalPixels": H3ImageScaleToTotalPixels,
+    "PrimitiveFloat": H3PrimitiveFloat,
+    "ComfyMathExpression": H3ComfyMathExpression,
 }
 
 # ComfyUI's load_custom_node() filters native node names via `ignore` param,
@@ -327,6 +350,15 @@ _native_overrides = {
     "MarkdownNote": MarkdownNote,
     "SaveWEBM": SaveWEBM,
     "SaveAnimatedWEBP": SaveAnimatedWEBP,
+    # H3 nodes that override core comfy_extras nodes (CreateVideo/SaveVideo in
+    # nodes_video, VAEDecodeAudio in nodes_audio, aux in nodes_post_processing/
+    # nodes_math/nodes_primitive). Monkey-patched so AICF H3 workflows route here.
+    "VAEDecodeAudio": H3VAEDecodeAudio,
+    "CreateVideo": H3CreateVideo,
+    "SaveVideo": H3SaveVideo,
+    "ImageScaleToTotalPixels": H3ImageScaleToTotalPixels,
+    "PrimitiveFloat": H3PrimitiveFloat,
+    "ComfyMathExpression": H3ComfyMathExpression,
 }
 
 try:
@@ -448,6 +480,17 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "FusionIPAdapterInject": "⚡ Fusion-MLX IP-Adapter Inject",
     # Debug
     "FusionDenoiseStats": "⚡ Fusion-MLX Denoise Stats",
+    # H3 (MiniMax H3) sampling-pipe nodes for AICF workflows
+    "MiniMaxH3SigmaShift": "⚡ MiniMax H3 Sigma Shift (fusion-mlx)",
+    "EmptyMiniMaxH3LatentAV": "⚡ Empty MiniMax H3 Latent AV (fusion-mlx)",
+    "MiniMaxH3ImageToVideo": "⚡ MiniMax H3 Image To Video (fusion-mlx)",
+    "MiniMaxH3ReferenceToVideo": "⚡ MiniMax H3 Reference To Video (fusion-mlx)",
+    "VAEDecodeAudio": "⚡ VAE Decode Audio (fusion-mlx)",
+    "CreateVideo": "⚡ Create Video (fusion-mlx)",
+    "SaveVideo": "⚡ Save Video (fusion-mlx)",
+    "ImageScaleToTotalPixels": "⚡ Image Scale To Total Pixels (fusion-mlx)",
+    "PrimitiveFloat": "⚡ Primitive Float (fusion-mlx)",
+    "ComfyMathExpression": "⚡ ComfyMath Expression (fusion-mlx)",
 }
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]

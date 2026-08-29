@@ -185,6 +185,36 @@ async def _generate_monolithic(model_wrapper, positive, negative, latent_image,
             gen_kwargs["reference_images"] = vace_ref
             logger.info("_generate_monolithic: VACE reference_images=%s", vace_ref)
 
+        # H3 (minimax_h3) keys: quantize (33B needs dit8_te4 or jetsam OOM),
+        # audio (t2va joint denoise), image/last_frame_image (fl2va keyframe),
+        # reference_images (ref2va — upstream-blocked, dropped at engine layer).
+        h3_quantize = latent_image.get("_h3_quantize")
+        h3_audio = latent_image.get("_h3_audio", False)
+        h3_first = latent_image.get("_h3_first_frame_path")
+        h3_last = latent_image.get("_h3_last_frame_path")
+        h3_refs = latent_image.get("_h3_ref_images")
+        if h3_quantize:
+            gen_kwargs["quantize"] = h3_quantize
+        if h3_audio:
+            gen_kwargs["audio"] = True
+        if h3_first:
+            gen_kwargs["image"] = h3_first
+            if i2v_image:
+                logger.warning("_generate_monolithic: H3 first_frame overrides _i2v_image_path")
+        if h3_last:
+            # UPSTREAM GAP: VideoGenEngine.generate does not forward last_frame_image
+            # to VideoGenParams (field exists, backend reads it, engine drops it).
+            # Sent regardless; dropped silently until the fusion-mlx PR lands.
+            gen_kwargs["last_frame_image"] = h3_last
+        if h3_refs:
+            # UPSTREAM GAP: MiniMaxH3Backend.generate drops reference_images (no ref2va
+            # branch). Sent regardless; h3-r2v e2e stays xfail until the PR lands.
+            gen_kwargs["reference_images"] = h3_refs
+        if h3_quantize or h3_audio or h3_first or h3_last or h3_refs:
+            logger.info("_generate_monolithic: H3 mode quantize=%s audio=%s first=%s last=%s refs=%s",
+                         h3_quantize, h3_audio, h3_first is not None, h3_last is not None,
+                         len(h3_refs) if h3_refs else 0)
+
         try:
             result_raw = await engine._engine.generate(**gen_kwargs)
             if isinstance(result_raw[0], np.ndarray):

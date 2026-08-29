@@ -51,6 +51,8 @@ class EmptyMiniMaxH3LatentAV:
                 "width": ("INT", {"default": 960, "min": 32, "max": 16384, "step": 32}),
                 "height": ("INT", {"default": 544, "min": 32, "max": 16384, "step": 32}),
                 "length": ("INT", {"default": 73, "min": 5, "max": 3600, "step": 17}),
+            },
+            "optional": {
                 "batch_size": ("INT", {"default": 1, "min": 1, "max": 4096}),
             }
         }

@@ -26,12 +26,17 @@ SAMPLER_NAMES = [
     "ipndm",
     "ipndm2",
     "lms",
+    # MiniMax-H3 flow-matching sampler (AICF workflows). The MLX H3 engine
+    # uses its own internal flow schedule and ignores sampler_name; this alias
+    # lets H3 workflows pass prompt validation and normalizes to a known solver.
+    "res_multistep",
 ]
 
 SAMPLER_ALIASES = {
     "uni_pc": "unipc",
     "uni_pc_bh2": "unipc",
     "lcm": "euler",
+    "res_multistep": "unipc",
     "dpmpp_2m_sde": "dpmpp_2m",
     "dpmpp_sde": "dpmpp_2m",
     "dpmpp_3m_sde": "dpmpp_2m",

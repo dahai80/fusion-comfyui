@@ -23,6 +23,12 @@ _KNOWN_DIFFUSION_MODELS = [
     "skyreels_v3_r2v_14b_mlx.safetensors",
     "skyreels_v3_v2v_14b_mlx.safetensors",
     "minimax-h3/FL2VA",
+    "minimax_h3_fl2va_pruned_nvfp4.safetensors",
+    "minimax_h3_ref2va_pruned_nvfp4.safetensors",
+    # Qwen-Image (Qwen/Qwen-Image-2512) DiT via mflux. AICF qwen-2512-t2i
+    # workflow uses the GGUF filename; fusion-mlx maps it to the mflux repo id.
+    "qwen-image-2512-Q4_K_M.gguf",
+    "qwen-image-edit-2511-Q4_K_M.gguf",
 ]
 
 _KNOWN_TEXT_ENCODERS = [
@@ -32,6 +38,9 @@ _KNOWN_TEXT_ENCODERS = [
     "clip_l.safetensors",
     "llava_llama3_fp8_scaled.safetensors",
     "t5_encoder.safetensors",
+    "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+    # Qwen-Image text encoder (Qwen2.5-VL-7B nvfp4). AICF qwen-2512-t2i CLIPLoader.
+    "qwen_2.5_vl_7b_nvfp4.safetensors",
 ]
 
 _KNOWN_VAE_MODELS = [
@@ -40,6 +49,11 @@ _KNOWN_VAE_MODELS = [
     "cosmos_cv8x8x8_1.0.safetensors",
     "hunyuan_video_vae_bf16.safetensors",
     "vae.safetensors",
+    "minimax_h3_video_vae_fp16.safetensors",
+    "minimax_h3_audio_vae_fp32.safetensors",
+    # Qwen-Image VAE. AICF qwen-2512-t2i VAELoader (VAEDecode uses mflux decoder,
+    # this filename exists so the workflow's enum passes prompt validation).
+    "qwen_image_vae.safetensors",
 ]
 
 _KNOWN_CLIP_VISION = [
@@ -149,7 +163,7 @@ class CLIPLoader:
         return {
             "required": {
                 "clip_name": (_get_text_encoders(),),
-                "type": (["stable_diffusion", "stable_cascade", "sd3", "stable_audio", "mochi", "ltxv", "pixart", "cosmos", "lumina2", "wan", "hidream", "chroma", "ace", "omnigen2", "qwen_image", "hunyuan_image", "flux2", "ovis", "longcat_image", "cogvideox", "lens", "pixeldit", "ideogram4", "boogu", "krea2", "joyimage"],),
+                "type": (["stable_diffusion", "stable_cascade", "sd3", "stable_audio", "mochi", "ltxv", "pixart", "cosmos", "lumina2", "wan", "hidream", "chroma", "ace", "omnigen2", "qwen_image", "hunyuan_image", "flux2", "ovis", "longcat_image", "cogvideox", "lens", "pixeldit", "ideogram4", "boogu", "krea2", "joyimage", "minimax"],),
             },
             "optional": {
                 "device": (["default", "cpu"], {"advanced": True}),

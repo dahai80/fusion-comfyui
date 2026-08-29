@@ -92,6 +92,119 @@ class ModelSamplingFlux:
         return (model,)
 
 
+class ModelSamplingAuraFlow:
+    """Passthrough — no-op for fusion-mlx. Overrides native node which calls
+    model.add_object_patch("model_sampling", ...) + model.clone(); FusionModelWrapper
+    has no patch/clone API (MLX weights are frozen for inference)."""
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "model": ("MODEL",),
+                "shift": ("FLOAT", {"default": 1.73, "min": 0.0, "max": 100.0, "step": 0.01}),
+            }
+        }
+    RETURN_TYPES = ("MODEL",)
+    FUNCTION = "patch_aura"
+    CATEGORY = "model/patch"
+
+    def patch_aura(self, model, shift):
+        logger.info("ModelSamplingAuraFlow passthrough: shift=%.2f", shift)
+        return (model,)
+
+
+class CFGNorm:
+    """Passthrough — no-op for fusion-mlx. Overrides native node which calls
+    model.clone() + set_model_sampler_post_cfg_function; FusionModelWrapper has
+    no clone/patch API. qwen-2512-t2i workflow chains CFGNorm(strength=1.0)."""
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "model": ("MODEL",),
+                "strength": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 100.0, "step": 0.01}),
+            },
+            "optional": {
+                "pre_cfg": ("BOOLEAN", {"default": False}),
+            },
+        }
+    RETURN_TYPES = ("MODEL",)
+    FUNCTION = "patch"
+    CATEGORY = "advanced/guidance"
+
+    def patch(self, model, strength=1.0, pre_cfg=False):
+        logger.info("CFGNorm passthrough: strength=%.2f pre_cfg=%s", strength, pre_cfg)
+        return (model,)
+
+
+class LoraLoaderModelOnly:
+    """Passthrough — no-op for fusion-mlx. Overrides native node which loads
+    LoRA weights and patches model.get_model_object(...); FusionModelWrapper has
+    no LoRA patch surface. qwen-2512-t2i workflow chains a Turbo-4steps LoRA
+    (strength 1.0) that mflux ignores; the 4-step schedule is baked into the
+    model variant config, so dropping the LoRA does not change step count."""
+    @classmethod
+    def INPUT_TYPES(cls):
+        fallback = [
+            "Wuli-Qwen-Image-2512-Turbo-LoRA-4steps-V2.0-bf16.safetensors",
+        ]
+        loras = list(fallback)
+        try:
+            import folder_paths
+            loras = sorted(set(list(folder_paths.get_filename_list("loras")) + fallback))
+        except Exception:
+            pass
+        return {
+            "required": {
+                "model": ("MODEL",),
+                "lora_name": (loras,),
+                "strength_model": ("FLOAT", {"default": 1.0, "min": -100.0, "max": 100.0, "step": 0.01}),
+            }
+        }
+    RETURN_TYPES = ("MODEL",)
+    FUNCTION = "load_lora"
+    CATEGORY = "model/loaders"
+
+    def load_lora(self, model, lora_name, strength_model):
+        logger.info("LoraLoaderModelOnly passthrough: lora=%s strength=%.2f (mflux ignores LoRA)", lora_name, strength_model)
+        return (model,)
+
+
+class UnetLoaderGGUF:
+    """Loads a GGUF-named DiT via fusion-mlx. ComfyUI-GGUF custom node ships
+    this class (not native); registered here so AICF qwen-2512-t2i workflow
+    (UnetLoaderGGUF node + qwen-image-2512-Q4_K_M.gguf filename) passes prompt
+    validation. Maps the GGUF filename to the mflux Qwen-Image repo id, exactly
+    like UNETLoader.load_unet does for safetensors names."""
+    @classmethod
+    def INPUT_TYPES(cls):
+        from .loaders import _get_diffusion_models
+        return {
+            "required": {
+                "unet_name": (_get_diffusion_models(),),
+            }
+        }
+    RETURN_TYPES = ("MODEL",)
+    FUNCTION = "load_unet"
+    CATEGORY = "model/loaders"
+
+    def load_unet(self, unet_name):
+        from fusion_comfyui.core.wrappers import (
+            FusionModelWrapper, _map_unet_name_to_model_name,
+            _infer_model_type, _resolve_model_path,
+        )
+        model_name = _map_unet_name_to_model_name(unet_name)
+        model_type = _infer_model_type(model_name)
+        model_path = _resolve_model_path(model_name)
+        wrapper = FusionModelWrapper(
+            model_path=model_path,
+            model_name=model_name,
+            model_type=model_type,
+        )
+        logger.info("UnetLoaderGGUF: unet=%s -> model=%s type=%s", unet_name, model_name, model_type)
+        return (wrapper,)
+
+
 class BasicGuider:
     """Passthrough — guider selection is irrelevant for fusion-mlx generate()."""
     @classmethod

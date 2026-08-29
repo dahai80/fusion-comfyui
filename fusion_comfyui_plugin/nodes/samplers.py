@@ -78,6 +78,11 @@ def _should_use_staged(model_wrapper, positive, negative, latent_image, denoise)
         logger.info("_should_use_staged: video T2V -> staged")
         return True
     if model_type == "image":
+        model_name = getattr(model_wrapper, "model_name", "") or ""
+        is_qwen = "qwen" in model_name.lower() and "image" in model_name.lower()
+        if is_qwen:
+            logger.info("_should_use_staged: qwen-image -> monolith (staged encode_text not yet wired for qwen upstream)")
+            return False
         if has_cascade_prior:
             logger.info("_should_use_staged: image cascade stage_b -> pass-through (monolith)")
             return False

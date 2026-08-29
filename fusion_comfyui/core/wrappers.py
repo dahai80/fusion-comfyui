@@ -371,6 +371,7 @@ def _map_clip_type_to_model_name(clip_type: str, clip_name: str) -> str:
         "hunyuan_image": "HunyuanVideo",
         "sd3": "FLUX.2-klein-base-4B",
         "flux2": "FLUX.2-klein-base-4B",
+        "minimax": "minimax-h3/FL2VA",
     }
     return type_to_model.get(clip_type, clip_name)
 
@@ -481,6 +482,14 @@ def _map_unet_name_to_model_name(unet_name: str) -> str:
     if "minimax" in name or "h3" in name or "fl2va" in name or "ref2va" in name:
         logger.info("Map minimax-H3 unet %s -> minimax-h3/FL2VA", unet_name)
         return "minimax-h3/FL2VA"
+    # Qwen-Image (Qwen/Qwen-Image-2512) DiT MMDiT via mflux. mflux loads the
+    # pre-quantized MLX repo directly from HF cache (no ~/.fusion-mlx/models dir),
+    # so return the repo id; _resolve_model_path resolves the cache slug.
+    # Both "qwen-image" (GGUF filename) and "qwen-image-edit" route here; the
+    # downstream ImageGenEngine._infer_variant distinguishes txt2img vs edit.
+    if "qwen-image" in name or "qwen_image" in name:
+        logger.info("Map Qwen-Image unet %s -> mlx-community/Qwen-Image-2512-4bit", unet_name)
+        return "mlx-community/Qwen-Image-2512-4bit"
     if "flux" in name:
         if "4b" in name or "base-4" in name:
             return "FLUX.2-klein-base-4B"

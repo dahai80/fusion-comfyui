@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fusion-comfyui"
-version = "0.2.13"
+version = "0.2.14"
 description = "Pure MLX ComfyUI server on Apple Silicon — no PyTorch runtime"
 readme = "README.md"
 license = "Apache-2.0"
@@ -25,7 +25,7 @@ classifiers = [
 ]
 dependencies = [
     "mlx>=0.22.0",
-    "fusion-mlx>=0.8.40",
+    "fusion-mlx>=0.8.51",
     "pillow>=10.0",
     "imageio>=2.34",
     "imageio-ffmpeg>=0.4.9",

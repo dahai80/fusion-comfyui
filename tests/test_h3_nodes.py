@@ -109,6 +109,63 @@ class TestMiniMaxH3ImageToVideo:
                 os.unlink(path)
 
 
+class TestH3Res768pOverride:
+    # AICF hardcodes 16:9 -> 960x544 (540p) in provider.ts (off-limits).
+    # FUSION_H3_VIDEO_768P=1 raises the video resolution to 768p (1280x720
+    # for 16:9) inside the fusion-comfyui node, no AICF code change. Only
+    # raises (never lowers); rounds to mult of 16; preserves aspect.
+
+    def test_i2v_768p_raises_16x9_540p_to_768p_short_side(self, monkeypatch):
+        monkeypatch.setenv("FUSION_H3_VIDEO_768P", "1")
+        out = MiniMaxH3ImageToVideo().generate(
+            clip={}, vae={}, prompt="p", width=960, height=544, length=73,
+        )
+        latent = out[1]
+        # short side 544 -> 768, aspect preserved, mult of 16: 960x544 -> 1360x768
+        assert latent["width"] == 1360
+        assert latent["height"] == 768
+        # latent spatial must match new res (/16)
+        assert latent["samples"].shape[-2:] == (768 // 16, 1360 // 16)
+
+    def test_i2v_768p_off_keeps_540p(self, monkeypatch):
+        monkeypatch.delenv("FUSION_H3_VIDEO_768P", raising=False)
+        out = MiniMaxH3ImageToVideo().generate(
+            clip={}, vae={}, prompt="p", width=960, height=544, length=73,
+        )
+        latent = out[1]
+        assert latent["width"] == 960
+        assert latent["height"] == 544
+
+    def test_i2v_768p_raises_9x16_portrait_to_768p_short_side(self, monkeypatch):
+        monkeypatch.setenv("FUSION_H3_VIDEO_768P", "1")
+        out = MiniMaxH3ImageToVideo().generate(
+            clip={}, vae={}, prompt="p", width=544, height=960, length=73,
+        )
+        latent = out[1]
+        # portrait: short side 544 -> 768 -> 768x1360
+        assert latent["width"] == 768
+        assert latent["height"] == 1360
+
+    def test_i2v_768p_never_lowers_higher_res(self, monkeypatch):
+        # 1:1 768x768 already >= 768p short side -> unchanged
+        monkeypatch.setenv("FUSION_H3_VIDEO_768P", "1")
+        out = MiniMaxH3ImageToVideo().generate(
+            clip={}, vae={}, prompt="p", width=768, height=768, length=73,
+        )
+        latent = out[1]
+        assert latent["width"] == 768
+        assert latent["height"] == 768
+
+    def test_r2v_768p_also_raises_16x9(self, monkeypatch):
+        monkeypatch.setenv("FUSION_H3_VIDEO_768P", "1")
+        out = MiniMaxH3ReferenceToVideo().generate(
+            clip={}, vae={}, prompt="p", width=960, height=544, length=73,
+        )
+        latent = out[1]
+        assert latent["width"] == 1360
+        assert latent["height"] == 768
+
+
 class TestMiniMaxH3ReferenceToVideo:
     def test_ref_images_dict_to_tmp_paths(self):
         ref = np.zeros((1, 32, 32, 3), dtype=np.float32)

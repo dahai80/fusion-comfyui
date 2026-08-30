@@ -27,8 +27,11 @@ def _save_temp_image(image, prefix):
 def _apply_768p_override(width, height):
     # AICF hardcodes 16:9 -> 960x544 (540p) in provider.ts; that code is off-limits.
     # FUSION_H3_VIDEO_768P=1 raises the video resolution to 768p inside this node,
-    # preserving aspect and rounding to mult of 16 (H3 VAE spatial /16). Only raises,
-    # never lowers. 768p ~1.76x pixels of 540p -> shots must be <= ~3s to stay under
+    # preserving aspect and rounding to mult of 32. H3 VAE spatial /16 then patchify
+    # /2 (patch_size=2) -> latent dims must be even -> width/height mult of 32.
+    # Rounding to 16 alone yields odd latent dims (e.g. 1360/16=85) and trips
+    # patchify_video_latents "not divisible by patch (1,2,2)". Only raises, never
+    # lowers. 768p ~1.76x pixels of 540p -> shots must be <= ~3s to stay under
     # AICF's 30min poll deadline (see AICF provider.ts timeout 1_800_000).
     if os.environ.get("FUSION_H3_VIDEO_768P", "0") != "1":
         return width, height
@@ -37,8 +40,8 @@ def _apply_768p_override(width, height):
     if short >= target_short:
         return width, height
     scale = target_short / short
-    new_w = int(round(width * scale / 16)) * 16
-    new_h = int(round(height * scale / 16)) * 16
+    new_w = int(round(width * scale / 32)) * 32
+    new_h = int(round(height * scale / 32)) * 32
     logger.info("_apply_768p_override: %dx%d -> %dx%d (FUSION_H3_VIDEO_768P=1)",
                 width, height, new_w, new_h)
     return new_w, new_h

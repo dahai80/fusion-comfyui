@@ -111,9 +111,10 @@ class TestMiniMaxH3ImageToVideo:
 
 class TestH3Res768pOverride:
     # AICF hardcodes 16:9 -> 960x544 (540p) in provider.ts (off-limits).
-    # FUSION_H3_VIDEO_768P=1 raises the video resolution to 768p (1280x720
+    # FUSION_H3_VIDEO_768P=1 raises the video resolution to 768p (1344x768
     # for 16:9) inside the fusion-comfyui node, no AICF code change. Only
-    # raises (never lowers); rounds to mult of 16; preserves aspect.
+    # raises (never lowers); rounds to mult of 32 (H3 patchify /2 needs even
+    # latent dims); preserves aspect.
 
     def test_i2v_768p_raises_16x9_540p_to_768p_short_side(self, monkeypatch):
         monkeypatch.setenv("FUSION_H3_VIDEO_768P", "1")
@@ -121,11 +122,11 @@ class TestH3Res768pOverride:
             clip={}, vae={}, prompt="p", width=960, height=544, length=73,
         )
         latent = out[1]
-        # short side 544 -> 768, aspect preserved, mult of 16: 960x544 -> 1360x768
-        assert latent["width"] == 1360
+        # short side 544 -> 768, aspect preserved, mult of 32: 960x544 -> 1344x768
+        assert latent["width"] == 1344
         assert latent["height"] == 768
-        # latent spatial must match new res (/16)
-        assert latent["samples"].shape[-2:] == (768 // 16, 1360 // 16)
+        # latent spatial must match new res (/16), both dims even for patchify /2
+        assert latent["samples"].shape[-2:] == (768 // 16, 1344 // 16)
 
     def test_i2v_768p_off_keeps_540p(self, monkeypatch):
         monkeypatch.delenv("FUSION_H3_VIDEO_768P", raising=False)
@@ -142,9 +143,9 @@ class TestH3Res768pOverride:
             clip={}, vae={}, prompt="p", width=544, height=960, length=73,
         )
         latent = out[1]
-        # portrait: short side 544 -> 768 -> 768x1360
+        # portrait: short side 544 -> 768 -> 768x1344
         assert latent["width"] == 768
-        assert latent["height"] == 1360
+        assert latent["height"] == 1344
 
     def test_i2v_768p_never_lowers_higher_res(self, monkeypatch):
         # 1:1 768x768 already >= 768p short side -> unchanged
@@ -162,7 +163,7 @@ class TestH3Res768pOverride:
             clip={}, vae={}, prompt="p", width=960, height=544, length=73,
         )
         latent = out[1]
-        assert latent["width"] == 1360
+        assert latent["width"] == 1344
         assert latent["height"] == 768
 
 

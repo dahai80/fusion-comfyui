@@ -66,6 +66,15 @@ def _should_use_staged(model_wrapper, positive, negative, latent_image, denoise)
         or latent_image.get("_vace_reference_images")
     )
     has_init = bool(latent_image.get("_image_init_path"))
+    has_h3 = bool(
+        latent_image.get("_h3_quantize")
+        or latent_image.get("_h3_audio")
+        or latent_image.get("_h3_first_frame_path")
+        or latent_image.get("_h3_last_frame_path")
+        or latent_image.get("_h3_ref_images")
+    )
+    model_name = (getattr(model_wrapper, "model_name", "") or "").lower()
+    is_h3_model = "minimax" in model_name or "h3" in model_name
     has_cascade_prior = False
     for cond in (positive, negative):
         if isinstance(cond, dict) and cond.get("stable_cascade_prior") is not None:
@@ -75,11 +84,16 @@ def _should_use_staged(model_wrapper, positive, negative, latent_image, denoise)
         if has_i2v or has_vace:
             logger.info("_should_use_staged: video monolith (i2v=%s vace=%s)", has_i2v, has_vace)
             return False
+        if has_h3 or is_h3_model:
+            # H3 (minimax_h3) backend has no stage API — load_text_encoder raises
+            # NotImplementedError (issue #170 phase 2). Route ANY H3 job (T2V,
+            # i2v first/last frame, t2va audio, ref2va) to the monolith path.
+            logger.info("_should_use_staged: H3 video -> monolith (no stage API, issue #170)")
+            return False
         logger.info("_should_use_staged: video T2V -> staged")
         return True
     if model_type == "image":
-        model_name = getattr(model_wrapper, "model_name", "") or ""
-        is_qwen = "qwen" in model_name.lower() and "image" in model_name.lower()
+        is_qwen = "qwen" in model_name and "image" in model_name
         if is_qwen:
             logger.info("_should_use_staged: qwen-image -> monolith (staged encode_text not yet wired for qwen upstream)")
             return False

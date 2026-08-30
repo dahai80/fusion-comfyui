@@ -19,6 +19,24 @@ from fusion_comfyui_plugin.nodes.h3 import (
 from fusion_comfyui_plugin.nodes.samplers import _generate_monolithic
 
 
+def _make_real_mp4(path):
+    import av
+    container = av.open(str(path), mode="w")
+    stream = container.add_stream("mpeg4", rate=4)
+    stream.width = 8
+    stream.height = 8
+    stream.pix_fmt = "yuv420p"
+    for _ in range(4):
+        frame = av.VideoFrame(8, 8, "yuv420p")
+        for packet in stream.encode(frame):
+            container.mux(packet)
+    for packet in stream.encode():
+        container.mux(packet)
+    container.close()
+    with open(path, "rb") as _f:
+        return _f.read()
+
+
 class TestMiniMaxH3SigmaShift:
     def test_passthrough_returns_model_unchanged(self):
         model = {"_kind": "h3_model"}
@@ -243,3 +261,58 @@ class TestGenerateMonolithicH3Forwarding:
         assert kwargs["audio"] is True
         assert kwargs["image"] == "/tmp/fake_first.png"
         assert kwargs["reference_images"] == ["/tmp/fake_ref.png"]
+
+
+class TestGenerateMonolithicMp4NoDoubleGenerate:
+    async def test_h3_mp4_bytes_generate_called_once(self, tmp_path):
+        # H3 backend ignores output_format="raw" and always returns mp4 bytes.
+        # The first generate already produced the mp4 — re-generating doubles
+        # wall-clock (17min x2 = 34min) and blows the AICF 30min poll deadline.
+        # Regression guard: when the engine returns bytes, generate MUST be
+        # called exactly once (reuse the bytes, do not re-generate).
+        fake_mp4 = _make_real_mp4(tmp_path / "fixture.mp4")
+
+        class FakeInner:
+            def __init__(self):
+                self.call_count = 0
+
+            async def generate(self, **kwargs):
+                self.call_count += 1
+                return [fake_mp4]
+
+        class FakeEngineWrapper:
+            def __init__(self):
+                self._engine = FakeInner()
+
+            async def ensure_started(self):
+                pass
+
+        class FakeModelWrapper:
+            model_type = "video"
+
+            def __init__(self):
+                self._wrapper = FakeEngineWrapper()
+
+            def get_engine(self):
+                return self._wrapper
+
+        mw = FakeModelWrapper()
+        latent_image = {
+            "samples": np.zeros((1, 24, 3, 4, 4), dtype=np.float32),
+            "num_frames": 8,
+            "width": 64,
+            "height": 64,
+            "_h3_quantize": "dit8_te4",
+            "_h3_first_frame_path": "/tmp/fake_first.png",
+            "_h3_last_frame_path": "/tmp/fake_last.png",
+        }
+        result = await _generate_monolithic(
+            mw, {"prompt": "p"}, {"prompt": ""},
+            latent_image, steps=10, cfg=6.0, seed=1,
+            width=64, height=64, num_frames=8,
+        )
+        assert mw.get_engine()._engine.call_count == 1, (
+            "mp4-bytes path must not re-generate (would double wall-clock)"
+        )
+        assert isinstance(result, np.ndarray)
+        assert result.ndim >= 3

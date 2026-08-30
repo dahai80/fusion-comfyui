@@ -234,6 +234,7 @@ async def _generate_monolithic(model_wrapper, positive, negative, latent_image,
                          h3_quantize, h3_audio, h3_first is not None, h3_last is not None,
                          len(h3_refs) if h3_refs else 0)
 
+        result_bytes = None
         try:
             result_raw = await engine._engine.generate(**gen_kwargs)
             if isinstance(result_raw[0], np.ndarray):
@@ -242,11 +243,20 @@ async def _generate_monolithic(model_wrapper, positive, negative, latent_image,
                 if video.ndim == 4 and video.shape[3] == 3:
                     return video
                 return np.stack([video], axis=0)
+            # Backend ignored output_format="raw" and returned mp4 bytes (H3
+            # minimax_h3.generate never reads output_format). Reuse this result
+            # instead of re-generating — a second generate doubles wall-clock
+            # (17min x2) and blows the caller's poll deadline.
+            if isinstance(result_raw[0], (bytes, bytearray)):
+                result_bytes = result_raw
+                logger.info("_generate_monolithic: raw unsupported, reusing mp4 bytes from first generate")
         except (TypeError, AttributeError) as e:
             logger.info("_generate_monolithic: raw output not supported, falling back to mp4: %s", e)
             gen_kwargs.pop("output_format", None)
 
-        result_bytes = await engine._engine.generate(**gen_kwargs)
+        if result_bytes is None:
+            gen_kwargs.pop("output_format", None)
+            result_bytes = await engine._engine.generate(**gen_kwargs)
         logger.info("_generate_monolithic: got %d result bytes arrays, sizes=%s",
                      len(result_bytes), [len(b) for b in result_bytes])
         try:

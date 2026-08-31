@@ -70,6 +70,7 @@ from .nodes.vae import FusionVAEDecoderNode, VAEDecode, VAEDecodeTiled
 from .nodes.latent import (
     FusionEmptyLatentNode,
     EmptyLatentImage,
+    EmptySD3LatentImage,
     EmptyHunyuanLatentVideo,
     EmptyCosmosLatentVideo,
     Wan22ImageToVideoLatent,
@@ -197,6 +198,7 @@ NODE_CLASS_MAPPINGS = {
     "VAEDecodeTiled": VAEDecodeTiled,
     # Latent
     "EmptyLatentImage": EmptyLatentImage,
+    "EmptySD3LatentImage": EmptySD3LatentImage,
     "EmptyHunyuanLatentVideo": EmptyHunyuanLatentVideo,
     "EmptyCosmosLatentVideo": EmptyCosmosLatentVideo,
     "Wan22ImageToVideoLatent": Wan22ImageToVideoLatent,
@@ -318,6 +320,7 @@ _native_overrides = {
     "VAEDecodeTiled": VAEDecodeTiled,
     "LatentUpscale": LatentUpscale,
     "EmptyLatentImage": EmptyLatentImage,
+    "EmptySD3LatentImage": EmptySD3LatentImage,
     "EmptyHunyuanLatentVideo": EmptyHunyuanLatentVideo,
     "EmptyCosmosLatentVideo": EmptyCosmosLatentVideo,
     "Wan22ImageToVideoLatent": Wan22ImageToVideoLatent,
@@ -424,6 +427,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "VAEDecode": "VAE Decode (fusion-mlx)",
     "VAEDecodeTiled": "VAE Decode Tiled (fusion-mlx)",
     "EmptyLatentImage": "Empty Latent Image (fusion-mlx)",
+    "EmptySD3LatentImage": "Empty SD3 Latent Image (fusion-mlx)",
     "EmptyHunyuanLatentVideo": "Empty Hunyuan Latent Video (fusion-mlx)",
     "EmptyCosmosLatentVideo": "Empty Cosmos Latent Video (fusion-mlx)",
     "Wan22ImageToVideoLatent": "Wan2.2 Image To Video Latent (fusion-mlx)",

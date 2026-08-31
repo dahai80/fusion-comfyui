@@ -26,6 +26,33 @@ class EmptyLatentImage:
         return ({"samples": latent, "width": width, "height": height},)
 
 
+class EmptySD3LatentImage:
+    # Override of ComfyUI native comfy_extras/nodes_sd3.py:EmptySD3LatentImage.
+    # Native returns {"samples": torch.zeros([b,16,h//8,w//8])} with NO width/height
+    # keys and a torch.Tensor. samplers.py KSampler only handles mx.array/np.ndarray
+    # shapes -> torch.Tensor hits the else fallback shape=(1,16,1,64,64) -> 512x512
+    # regardless of requested dims, bypassing the 768p keyframe cap. AICF qwen
+    # t2i workflow node 5 uses this node. Return mx.zeros WITH embedded width/height
+    # (same pattern as EmptyLatentImage above) so KSampler reads explicit dims.
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "width": ("INT", {"default": 1024, "min": 16, "max": 16384, "step": 16}),
+                "height": ("INT", {"default": 1024, "min": 16, "max": 16384, "step": 16}),
+                "batch_size": ("INT", {"default": 1, "min": 1, "max": 4096}),
+            }
+        }
+    RETURN_TYPES = ("LATENT",)
+    FUNCTION = "generate"
+    CATEGORY = "model/latent"
+
+    def generate(self, width=1024, height=1024, batch_size=1):
+        latent = mx.zeros((batch_size, 16, height // 8, width // 8), dtype=mx.float32)
+        logger.info("EmptySD3LatentImage: shape=%s (%dx%d)", latent.shape, width, height)
+        return ({"samples": latent, "width": width, "height": height},)
+
+
 class EmptyHunyuanLatentVideo:
     @classmethod
     def INPUT_TYPES(cls):

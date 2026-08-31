@@ -19,8 +19,16 @@ from fusion_comfyui_plugin.nodes.h3 import (
 from fusion_comfyui_plugin.nodes.samplers import _generate_monolithic
 
 
+def _import_av():
+    try:
+        import av
+        return av
+    except ImportError:
+        return None
+
+
 def _make_real_mp4(path):
-    import av
+    av = _import_av()
     container = av.open(str(path), mode="w")
     stream = container.add_stream("mpeg4", rate=4)
     stream.width = 8
@@ -107,6 +115,64 @@ class TestMiniMaxH3ImageToVideo:
         finally:
             if os.path.exists(path):
                 os.unlink(path)
+
+
+class TestH3Res768pOverride:
+    # AICF hardcodes 16:9 -> 960x544 (540p) in provider.ts (off-limits).
+    # FUSION_H3_VIDEO_768P=1 raises the video resolution to 768p (1344x768
+    # for 16:9) inside the fusion-comfyui node, no AICF code change. Only
+    # raises (never lowers); rounds to mult of 32 (H3 patchify /2 needs even
+    # latent dims); preserves aspect.
+
+    def test_i2v_768p_raises_16x9_540p_to_768p_short_side(self, monkeypatch):
+        monkeypatch.setenv("FUSION_H3_VIDEO_768P", "1")
+        out = MiniMaxH3ImageToVideo().generate(
+            clip={}, vae={}, prompt="p", width=960, height=544, length=73,
+        )
+        latent = out[1]
+        # short side 544 -> 768, aspect preserved, mult of 32: 960x544 -> 1344x768
+        assert latent["width"] == 1344
+        assert latent["height"] == 768
+        # latent spatial must match new res (/16), both dims even for patchify /2
+        assert latent["samples"].shape[-2:] == (768 // 16, 1344 // 16)
+
+    def test_i2v_768p_off_keeps_540p(self, monkeypatch):
+        monkeypatch.delenv("FUSION_H3_VIDEO_768P", raising=False)
+        out = MiniMaxH3ImageToVideo().generate(
+            clip={}, vae={}, prompt="p", width=960, height=544, length=73,
+        )
+        latent = out[1]
+        assert latent["width"] == 960
+        assert latent["height"] == 544
+
+    def test_i2v_768p_raises_9x16_portrait_to_768p_short_side(self, monkeypatch):
+        monkeypatch.setenv("FUSION_H3_VIDEO_768P", "1")
+        out = MiniMaxH3ImageToVideo().generate(
+            clip={}, vae={}, prompt="p", width=544, height=960, length=73,
+        )
+        latent = out[1]
+        # portrait: short side 544 -> 768 -> 768x1344
+        assert latent["width"] == 768
+        assert latent["height"] == 1344
+
+    def test_i2v_768p_never_lowers_higher_res(self, monkeypatch):
+        # 1:1 768x768 already >= 768p short side -> unchanged
+        monkeypatch.setenv("FUSION_H3_VIDEO_768P", "1")
+        out = MiniMaxH3ImageToVideo().generate(
+            clip={}, vae={}, prompt="p", width=768, height=768, length=73,
+        )
+        latent = out[1]
+        assert latent["width"] == 768
+        assert latent["height"] == 768
+
+    def test_r2v_768p_also_raises_16x9(self, monkeypatch):
+        monkeypatch.setenv("FUSION_H3_VIDEO_768P", "1")
+        out = MiniMaxH3ReferenceToVideo().generate(
+            clip={}, vae={}, prompt="p", width=960, height=544, length=73,
+        )
+        latent = out[1]
+        assert latent["width"] == 1344
+        assert latent["height"] == 768
 
 
 class TestMiniMaxH3ReferenceToVideo:
@@ -264,6 +330,12 @@ class TestGenerateMonolithicH3Forwarding:
 
 
 class TestGenerateMonolithicMp4NoDoubleGenerate:
+    # _make_real_mp4 needs PyAV (av) to forge the mp4 fixture; skip when absent
+    # (CI does not install the optional av extra).
+    pytestmark = pytest.mark.skipif(
+        _import_av() is None, reason="PyAV (av) not installed"
+    )
+
     async def test_h3_mp4_bytes_generate_called_once(self, tmp_path):
         # H3 backend ignores output_format="raw" and always returns mp4 bytes.
         # The first generate already produced the mp4 — re-generating doubles

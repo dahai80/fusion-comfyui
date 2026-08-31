@@ -24,6 +24,30 @@ def _save_temp_image(image, prefix):
     return path
 
 
+def _apply_768p_override(width, height):
+    # AICF hardcodes 16:9 -> 960x544 (540p) in provider.ts; that code is off-limits.
+    # FUSION_H3_VIDEO_768P=1 raises the video resolution to 768p inside this node,
+    # preserving aspect and rounding to mult of 32. H3 VAE spatial /16 then patchify
+    # /2 (patch_size=2) -> latent dims must be even -> width/height mult of 32.
+    # Rounding to 16 alone yields odd latent dims (e.g. 1360/16=85) and trips
+    # patchify_video_latents "not divisible by patch (1,2,2)". Only raises, never
+    # lowers. 768p ~1.76x pixels of 540p -> shots must be <= ~3s to stay under
+    # AICF's 30min poll deadline (see AICF provider.ts timeout 1_800_000).
+    if os.environ.get("FUSION_H3_VIDEO_768P", "0") != "1":
+        return width, height
+    target_short = 768
+    short = min(width, height)
+    if short >= target_short:
+        return width, height
+    scale = target_short / short
+    new_w = int(round(width * scale / 32)) * 32
+    new_h = int(round(height * scale / 32)) * 32
+    logger.info("_apply_768p_override: %dx%d -> %dx%d (FUSION_H3_VIDEO_768P=1)",
+                width, height, new_w, new_h)
+    return new_w, new_h
+
+
+
 class MiniMaxH3SigmaShift:
     @classmethod
     def INPUT_TYPES(cls):
@@ -65,6 +89,7 @@ class EmptyMiniMaxH3LatentAV:
         # (vae_ratio_t). Verified in fusion_mlx/video/minimax_h3/config.py
         # H3VAEConfig + generate.py _latents_shape. t_latent=(length-1)//4+1.
         import mlx.core as mx
+        width, height = _apply_768p_override(width, height)
         t_latent = (length - 1) // 4 + 1
         latent = mx.zeros((batch_size, 24, t_latent, height // 16, width // 16), dtype=mx.float32)
         logger.info("EmptyMiniMaxH3LatentAV: shape=%s %dx%d frames=%d", latent.shape, width, height, length)
@@ -100,6 +125,7 @@ class MiniMaxH3ImageToVideo:
         # audio forced False: fl2va (image/last_frame) is video-only, audio+image
         # mutually exclusive (generate_video raises). Only t2va (no image) may set audio.
         import mlx.core as mx
+        width, height = _apply_768p_override(width, height)
         t_latent = (length - 1) // 4 + 1
         latent = mx.zeros((1, 24, t_latent, height // 16, width // 16), dtype=mx.float32)
         result = {"samples": latent, "num_frames": length, "width": width, "height": height,
@@ -150,6 +176,7 @@ class MiniMaxH3ReferenceToVideo:
         # _h3_ref_images is staged here but dropped at the engine layer until fusion-mlx
         # adds a ref2va branch (issue -> PR -> dep bump). h3-r2v e2e is BLOCKED until then.
         import mlx.core as mx
+        width, height = _apply_768p_override(width, height)
         t_latent = (length - 1) // 4 + 1
         latent = mx.zeros((1, 24, t_latent, height // 16, width // 16), dtype=mx.float32)
         result = {"samples": latent, "num_frames": length, "width": width, "height": height,

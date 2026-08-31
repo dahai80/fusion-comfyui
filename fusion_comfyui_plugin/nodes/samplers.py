@@ -1,5 +1,6 @@
 import io
 import logging
+import os
 
 import mlx.core as mx
 import numpy as np
@@ -10,6 +11,39 @@ from ._sampler_constants import SAMPLER_NAMES, SCHEDULER_NAMES, normalize_sample
 logger = logging.getLogger("fusion_comfyui.nodes.samplers")
 
 _decoded_frames_cache = {}
+
+
+def _apply_qwen_keyframe_res_cap(width, height, model_name, is_img2img):
+    # AICF generates qwen t2i keyframes at "2560x1440" (src/lib/ai/size.ts
+    # ratioToSize). H3 i2v DOWNSCALES the condition image to the video resolution
+    # anyway (fusion-mlx minimax_h3/generate.py _load_image_to_latent:
+    # img.resize((target_w, target_h), BILINEAR)), so 2560 detail is wasted. Worse,
+    # 2560x1440 takes ~9.6min (10x native 1024's 55s) and is out-of-distribution
+    # for the qwen DiT (trained at 1024) -> mild quality loss. With the H3 768p
+    # video override (h3.py _apply_768p_override), the consumed res is 1344x768.
+    # FUSION_QWEN_KEYFRAME_768P=1 caps the qwen-image txt2img keyframe to 768p short
+    # side (mult of 32, aspect preserved) so the keyframe is generated AT the res
+    # H3 consumes — faster, in-distribution, no wasted detail. Only caps qwen-image
+    # txt2img (not img2img init pass, not other image models). Only caps (never
+    # raises a request already <= cap). AICF code is off-limits so this is the only
+    # control point.
+    if os.environ.get("FUSION_QWEN_KEYFRAME_768P", "0") != "1":
+        return width, height
+    if is_img2img:
+        return width, height
+    name = (model_name or "").lower()
+    if "qwen" not in name or "image" not in name:
+        return width, height
+    target_short = 768
+    short = min(width, height)
+    if short <= target_short:
+        return width, height
+    scale = target_short / short
+    new_w = int(round(width * scale / 32)) * 32
+    new_h = int(round(height * scale / 32)) * 32
+    logger.info("_apply_qwen_keyframe_res_cap: %dx%d -> %dx%d (FUSION_QWEN_KEYFRAME_768P=1, qwen-image keyframe)",
+                width, height, new_w, new_h)
+    return new_w, new_h
 
 
 def _stash_init_image(arr: np.ndarray, latent_image: dict) -> None:
@@ -461,6 +495,13 @@ class KSampler:
                 num_frames = num_frames or 97
                 height = height or 512
                 width = width or 768
+
+        # Option 3: cap qwen-image txt2img keyframe to 768p (AICF sends 2560x1440,
+        # but H3 i2v downscales the keyframe to video res anyway). img2img init pass
+        # (denoise<1) is NOT capped — it refines at the caller's chosen resolution.
+        if model.model_type == "image":
+            _is_img2img = bool(latent_image.get("_image_init_path")) and denoise is not None and denoise < 1.0
+            width, height = _apply_qwen_keyframe_res_cap(width, height, model.model_name, _is_img2img)
 
         logger.info(
             "KSampler override: model=%s steps=%d cfg=%.1f seed=%d frames=%d %dx%d",

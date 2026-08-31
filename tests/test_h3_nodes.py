@@ -19,8 +19,16 @@ from fusion_comfyui_plugin.nodes.h3 import (
 from fusion_comfyui_plugin.nodes.samplers import _generate_monolithic
 
 
+def _import_av():
+    try:
+        import av
+        return av
+    except ImportError:
+        return None
+
+
 def _make_real_mp4(path):
-    import av
+    av = _import_av()
     container = av.open(str(path), mode="w")
     stream = container.add_stream("mpeg4", rate=4)
     stream.width = 8
@@ -322,6 +330,12 @@ class TestGenerateMonolithicH3Forwarding:
 
 
 class TestGenerateMonolithicMp4NoDoubleGenerate:
+    # _make_real_mp4 needs PyAV (av) to forge the mp4 fixture; skip when absent
+    # (CI does not install the optional av extra).
+    pytestmark = pytest.mark.skipif(
+        _import_av() is None, reason="PyAV (av) not installed"
+    )
+
     async def test_h3_mp4_bytes_generate_called_once(self, tmp_path):
         # H3 backend ignores output_format="raw" and always returns mp4 bytes.
         # The first generate already produced the mp4 — re-generating doubles

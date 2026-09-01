@@ -1,4 +1,7 @@
+import base64
+import io
 import logging
+import time
 
 import numpy as np
 
@@ -30,4 +33,64 @@ def super_resolve_frames(images, mode="0", scale=4,
 
 
 def _real_sr(images, scale, endpoint):
-    raise NotImplementedError("real SR implemented in Task 2")
+    import httpx
+    from PIL import Image
+
+    n, h, w, _ = images.shape
+    url = endpoint if endpoint.endswith("/super-resolution") \
+        else f"{endpoint.rstrip('/')}/v1/images/super-resolution"
+    logger.info("sr real: %d frames scale=%d endpoint=%s", n, scale, url)
+    max_retries = 3
+    t0 = time.time()
+    sr_frames = []
+    for i in range(n):
+        frame = (np.clip(images[i], 0, 1) * 255).astype(np.uint8)[:, :, :3]
+        buf = io.BytesIO()
+        Image.fromarray(frame).save(buf, format="PNG")
+        png = buf.getvalue()
+        ft0 = time.time()
+        resp = None
+        for attempt in range(1, max_retries + 1):
+            try:
+                with httpx.Client(timeout=60.0) as client:
+                    resp = client.post(
+                        url,
+                        files={"image": (f"frame_{i}.png", png, "image/png")},
+                        data={"scale": str(scale), "tile_size": "512"},
+                    )
+            except Exception as e:
+                logger.warning("sr real: frame %d attempt %d request failed: %s",
+                               i, attempt, e)
+                if attempt >= max_retries:
+                    raise RuntimeError(
+                        f"SR frame {i} failed after {max_retries} attempts "
+                        f"({endpoint}): {e}") from e
+                time.sleep(2 * attempt)
+                continue
+            if resp.status_code == 200:
+                break
+            transient = resp.status_code >= 500
+            logger.warning("sr real: frame %d attempt %d HTTP %s: %s",
+                           i, attempt, resp.status_code, resp.text[:200])
+            if not transient or attempt >= max_retries:
+                raise RuntimeError(
+                    f"SR frame {i} HTTP {resp.status_code} ({endpoint}): "
+                    f"{resp.text[:200]}")
+            time.sleep(2 * attempt)
+        if resp is None or resp.status_code != 200:
+            raise RuntimeError(
+                f"SR frame {i}: no successful response from {endpoint}")
+        body = resp.json()
+        sr_bytes = base64.b64decode(body["image_b64"])
+        if not sr_bytes:
+            raise RuntimeError(
+                f"SR frame {i}: empty image_b64 from {endpoint}")
+        sr_arr = np.array(Image.open(io.BytesIO(sr_bytes)).convert("RGB"),
+                          dtype=np.float32) / 255.0
+        sr_frames.append(sr_arr)
+        logger.info("sr real: frame %d/%d in=%dx%d out=%dx%d elapsed=%.2fs",
+                    i + 1, n, w, h, sr_arr.shape[1], sr_arr.shape[0],
+                    time.time() - ft0)
+    logger.info("sr real: done %d frames total elapsed=%.2fs",
+                n, time.time() - t0)
+    return np.stack(sr_frames, axis=0).astype(np.float32)

@@ -260,15 +260,25 @@ class SaveVideo:
     CATEGORY = "Fusion-MLX/H3"
 
     def save(self, video, filename_prefix="h3_t2v", format="auto", codec="auto"):
-        # Re-encode the passthrough IMAGE frames to mp4 via the proven PyAV helper.
-        # The MLX engine already produced the final muxed mp4; VAEDecode passed the
-        # decoded frames through, so we encode them here into output/ so /history serves
-        # the file AICF downloads. Returns {"ui": {"videos": [...]}} (ComfyUI contract).
         import folder_paths
+        from fusion_comfyui_plugin.nodes.sr import super_resolve_frames
         from fusion_comfyui_plugin.nodes.video_io import FusionSaveVideoNode
         images = video["images"] if isinstance(video, dict) else video
         fps = video.get("fps", 24.0) if isinstance(video, dict) else 24.0
         out_codec = "libx265" if codec == "libx265" else "libx264"
+        # SR post-processing (env-triggered, AICF-invisible). 0=off, 1=real
+        # fusion-mlx SR, mock=lanczos placeholder. Fail-loud: raises on SR
+        # error, no silent fallback to the blurry original (project Rule 12).
+        sr_mode = os.environ.get("FUSION_H3_SR", "0")
+        sr_scale = int(os.environ.get("FUSION_H3_SR_SCALE", "4"))
+        sr_endpoint = os.environ.get(
+            "FUSION_H3_SR_ENDPOINT",
+            "http://127.0.0.1:11434/v1/images/super-resolution")
+        if sr_mode in ("1", "mock"):
+            logger.info("SaveVideo(H3): SR mode=%s scale=%d endpoint=%s",
+                        sr_mode, sr_scale, sr_endpoint)
+            images = super_resolve_frames(images, mode=sr_mode, scale=sr_scale,
+                                          endpoint=sr_endpoint)
         output_dir = folder_paths.get_output_directory()
         full_output_folder, filename, counter, subfolder, _prefix = \
             folder_paths.get_save_image_path(filename_prefix, output_dir, images.shape[2], images.shape[1])
@@ -276,7 +286,8 @@ class SaveVideo:
         filepath = os.path.join(full_output_folder, file)
         helper = FusionSaveVideoNode()
         helper._encode_video_av(images, filepath, int(fps), out_codec, 18)
-        logger.info("SaveVideo(H3): saved %s frames=%s fps=%.1f", filepath, images.shape, fps)
+        logger.info("SaveVideo(H3): saved %s frames=%s fps=%.1f sr=%s",
+                    filepath, images.shape, fps, sr_mode)
         return {"ui": {"videos": [{"filename": file, "subfolder": subfolder, "type": "output"}]}}
 
 

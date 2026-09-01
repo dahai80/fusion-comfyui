@@ -107,14 +107,15 @@ FUSION_NVFP4_THRESHOLD_GB=8
 | 环境变量 | 默认值 | 取值 | 说明 |
 |---|---|---|---|
 | `FUSION_H3_SR` | `0` | `0` \| `1` \| `mock` | `0` = 关闭（不做超分）。`1` = 真实 fusion-mlx RealESRGAN 逐帧超分。`mock` = lanczos 4x 占位，用于在无 SR 模型时验证链路。 |
-| `FUSION_H3_SR_SCALE` | `4` | `4` \| `2` | 放大倍数。4x 超出时间预算时使用 `2`。永不自动降级——由操作者显式选择。 |
+| `FUSION_H3_SR_SCALE` | `4` | `4` \| `2` | 放大倍数。永不自动降级——由操作者显式选择。 |
 | `FUSION_H3_SR_ENDPOINT` | `http://127.0.0.1:11434/v1/images/super-resolution` | URL | fusion-mlx 超分端点。 |
+| `FUSION_MLX_API_KEY` | 未设置 | 字符串 | 发往 fusion-mlx 超分端点的 API 密钥（Bearer + x-api-key）。设为 fusion-mlx 当前强制使用的同一密钥（fusion-mlx 启动时的 `FUSION_MLX_API_KEY` 环境变量会覆盖 `~/.fusion-mlx/settings.json`）；配置了密钥的服务端会以 401 拒绝无鉴权头的请求。 |
 
 ### 模型准备（用于 `FUSION_H3_SR=1`）
 
 - 需要暴露 RealESRGAN 超分端点（`/v1/images/super-resolution`）的 fusion-mlx
-  版本（已在 PR-A fusion-mlx 版本中落地——属于独立的 fusion-mlx 版本依赖，请
-  查阅 fusion-mlx 更新日志）。
+  版本（已在 fusion-mlx v0.8.64 落地——`pyproject.toml` 已锁定
+  `fusion-mlx>=0.8.64`）。
 - 通过镜像 `https://hf-mirror.com` 下载 `RealESRGAN_x4plus.pth`，转换为
   safetensors，放置于
   `~/.fusion-mlx/models/realesrgan/RealESRGAN_x4plus.safetensors`。
@@ -122,14 +123,36 @@ FUSION_NVFP4_THRESHOLD_GB=8
 超分为失败即报错模式：若端点调用失败，`SaveVideo` 将抛出异常——不会静默回退到
 模糊的原始帧。
 
+### 时间预算与上线策略
+
+在 Apple Silicon（MLX RealESRGAN_x4plus，`tile_size=512`，完整 H3 输出
+1344x768）上的实测：
+
+- `scale=4`：约 39 秒/帧 → 52 帧约 34 分钟纯超分。
+- `scale=2`：约 41 秒/帧 → 52 帧约 36 分钟纯超分。
+
+超分每帧成本由**输入分辨率**决定，与输出放大倍数无关：23 层 RRDB 主体在
+1344x768 输入上对 `scale=2` 与 `scale=4` 都同样运行（最近邻上采样 + 卷积尾
+很廉价），所以 `scale=2` **并非**更快的逃生口。一次完整的 H3 i2v 768p dur2
+（约 21 分钟生成）+ 真实超分（约 34 分钟）合计约 55 分钟，超出 30 分钟的编排
+截止时间。
+
+画质已验证：RealESRGAN 能恢复被 H3 VAE 16 倍低通滤掉的高频细节——在 4x 输出
+分辨率上，真实超分携带的高频能量（拉普拉斯方差）约为 lanczos 放大同一模糊帧
+的 10000 倍（lanczos 不恢复任何细节，只是放大）。`mock` 路径仅是外观改善
+（更大但仍模糊）。
+
+上线策略：`mock` 为编排链路的截止安全默认值；当画质比墙钟时间更重要时设置
+`FUSION_H3_SR=1` 用于离线渲染。
+
 ```bash
-# 示例：真实 4x 超分
-FUSION_H3_SR=1 FUSION_H3_SR_SCALE=4
+# 示例：真实 4x 超分（离线，画质优先于速度）
+FUSION_H3_SR=1 FUSION_H3_SR_SCALE=4 FUSION_MLX_API_KEY=<your-key>
 
-# 示例：4x 过慢时使用 2x 超分
-FUSION_H3_SR=1 FUSION_H3_SR_SCALE=2
+# 示例：2x 超分（文件更小；并非更快——见上方时间预算）
+FUSION_H3_SR=1 FUSION_H3_SR_SCALE=2 FUSION_MLX_API_KEY=<your-key>
 
-# 示例：mock 模式（链路验证，无 SR 模型）
+# 示例：mock 模式（链路验证 / 截止安全默认值，无 SR 模型）
 FUSION_H3_SR=mock
 ```
 

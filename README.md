@@ -157,14 +157,15 @@ at save time and is off by default.
 | Env var | Default | Values | Description |
 |---|---|---|---|
 | `FUSION_H3_SR` | `0` | `0` \| `1` \| `mock` | `0` = off (no SR). `1` = real fusion-mlx RealESRGAN per-frame SR. `mock` = lanczos 4x placeholder for chain verification without the SR model. |
-| `FUSION_H3_SR_SCALE` | `4` | `4` \| `2` | Upscale factor. Use `2` if 4x blows the time budget. Never auto-downgrades — explicit operator choice. |
+| `FUSION_H3_SR_SCALE` | `4` | `4` \| `2` | Upscale factor. Never auto-downgrades — explicit operator choice. |
 | `FUSION_H3_SR_ENDPOINT` | `http://127.0.0.1:11434/v1/images/super-resolution` | URL | fusion-mlx SR endpoint. |
+| `FUSION_MLX_API_KEY` | unset | string | API key sent to the fusion-mlx SR endpoint (Bearer + x-api-key). Set to the same key fusion-mlx enforces (`FUSION_MLX_API_KEY` env on the fusion-mlx launch overrides `~/.fusion-mlx/settings.json`); a key-configured server 401-rejects a headerless request. |
 
 ### Model setup (for `FUSION_H3_SR=1`)
 
 - Requires a fusion-mlx release that exposes the RealESRGAN SR endpoint
-  (`/v1/images/super-resolution`, landed in the PR-A fusion-mlx release — a
-  separate fusion-mlx version dependency; check the fusion-mlx changelog).
+  (`/v1/images/super-resolution`, landed in fusion-mlx v0.8.64 —
+  `fusion-mlx>=0.8.64` is already pinned in `pyproject.toml`).
 - Download `RealESRGAN_x4plus.pth` via the mirror `https://hf-mirror.com`,
   convert it to safetensors, and place it at
   `~/.fusion-mlx/models/realesrgan/RealESRGAN_x4plus.safetensors`.
@@ -172,14 +173,38 @@ at save time and is off by default.
 SR is fail-loud: if the endpoint fails, `SaveVideo` raises — there is no silent
 fallback to the blurry original frame.
 
+### Time budget and ship posture
+
+Measured on Apple Silicon (MLX RealESRGAN_x4plus, `tile_size=512`, full H3
+output 1344x768):
+
+- `scale=4`: ~39 s/frame → 52 frames ≈ 34 min of SR alone.
+- `scale=2`: ~41 s/frame → 52 frames ≈ 36 min of SR alone.
+
+SR per-frame cost is **input-resolution-bound**, not output-scale-bound: the
+23-block RRDB body runs at the 1344x768 input for both `scale=2` and `scale=4`
+(the nearest-upsample + conv tail is cheap), so `scale=2` is **not** a faster
+escape hatch. A full H3 i2v 768p dur2 (≈21 min generate) + real SR (≈34 min)
+≈ 55 min, which exceeds a 30-min orchestration deadline.
+
+Quality is verified: RealESRGAN restores the high-frequency detail the H3 VAE
+16x low-pass destroys — at the 4x output resolution, real SR carries ~10000x
+more high-frequency energy (Laplacian variance) than lanczos upscaling of the
+same blurry frame (lanczos recovers none; it only enlarges). The `mock` path is
+cosmetic (larger but still blurry).
+
+Ship posture: `mock` is the deadline-safe default for orchestrated chains; set
+`FUSION_H3_SR=1` for offline renders where sharpness matters more than
+wall-clock.
+
 ```bash
-# Example: real 4x SR
-FUSION_H3_SR=1 FUSION_H3_SR_SCALE=4
+# Example: real 4x SR (offline, sharpness over speed)
+FUSION_H3_SR=1 FUSION_H3_SR_SCALE=4 FUSION_MLX_API_KEY=<your-key>
 
-# Example: 2x SR when 4x is too slow
-FUSION_H3_SR=1 FUSION_H3_SR_SCALE=2
+# Example: 2x SR (smaller files; NOT faster — see time budget above)
+FUSION_H3_SR=1 FUSION_H3_SR_SCALE=2 FUSION_MLX_API_KEY=<your-key>
 
-# Example: mock mode (chain verification, no SR model)
+# Example: mock mode (chain verification / deadline-safe default, no SR model)
 FUSION_H3_SR=mock
 ```
 

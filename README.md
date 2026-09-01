@@ -148,6 +148,41 @@ Denoise stats are queryable at runtime: the `FusionDenoiseStats` node (in the
 plugin `nodes/stats.py`) returns the last denoise run's acceptance/speedup
 counters as JSON, and fusion-mlx exposes `GET /v1/videos/denoise-stats?model=<name>`.
 
+## H3 Video Super-Resolution
+
+The `SaveVideo` node can upscale each frame of an H3 video output through a
+fusion-mlx RealESRGAN super-resolution endpoint. The feature is env-triggered
+at save time and is off by default.
+
+| Env var | Default | Values | Description |
+|---|---|---|---|
+| `FUSION_H3_SR` | `0` | `0` \| `1` \| `mock` | `0` = off (no SR). `1` = real fusion-mlx RealESRGAN per-frame SR. `mock` = lanczos 4x placeholder for chain verification without the SR model. |
+| `FUSION_H3_SR_SCALE` | `4` | `4` \| `2` | Upscale factor. Use `2` if 4x blows the time budget. Never auto-downgrades — explicit operator choice. |
+| `FUSION_H3_SR_ENDPOINT` | `http://127.0.0.1:11434/v1/images/super-resolution` | URL | fusion-mlx SR endpoint. |
+
+### Model setup (for `FUSION_H3_SR=1`)
+
+- Requires a fusion-mlx release that exposes the RealESRGAN SR endpoint
+  (`/v1/images/super-resolution`, landed in the PR-A fusion-mlx release — a
+  separate fusion-mlx version dependency; check the fusion-mlx changelog).
+- Download `RealESRGAN_x4plus.pth` via the mirror `https://hf-mirror.com`,
+  convert it to safetensors, and place it at
+  `~/.fusion-mlx/models/realesrgan/RealESRGAN_x4plus.safetensors`.
+
+SR is fail-loud: if the endpoint fails, `SaveVideo` raises — there is no silent
+fallback to the blurry original frame.
+
+```bash
+# Example: real 4x SR
+FUSION_H3_SR=1 FUSION_H3_SR_SCALE=4
+
+# Example: 2x SR when 4x is too slow
+FUSION_H3_SR=1 FUSION_H3_SR_SCALE=2
+
+# Example: mock mode (chain verification, no SR model)
+FUSION_H3_SR=mock
+```
+
 ## Reliability / Production Hardening
 
 The runtime was acceptance-verified against production release standard.

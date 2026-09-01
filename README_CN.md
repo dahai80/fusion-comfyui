@@ -99,6 +99,40 @@ FUSION_NVFP4_THRESHOLD_GB=8
 返回最近一次去噪的接受率/加速比计数（JSON），fusion-mlx 暴露
 `GET /v1/videos/denoise-stats?model=<name>`。
 
+## H3 视频超分
+
+`SaveVideo` 节点可在保存时对 H3 视频输出的每一帧通过 fusion-mlx RealESRGAN
+超分端点进行放大。该功能由环境变量在保存时触发，默认关闭。
+
+| 环境变量 | 默认值 | 取值 | 说明 |
+|---|---|---|---|
+| `FUSION_H3_SR` | `0` | `0` \| `1` \| `mock` | `0` = 关闭（不做超分）。`1` = 真实 fusion-mlx RealESRGAN 逐帧超分。`mock` = lanczos 4x 占位，用于在无 SR 模型时验证链路。 |
+| `FUSION_H3_SR_SCALE` | `4` | `4` \| `2` | 放大倍数。4x 超出时间预算时使用 `2`。永不自动降级——由操作者显式选择。 |
+| `FUSION_H3_SR_ENDPOINT` | `http://127.0.0.1:11434/v1/images/super-resolution` | URL | fusion-mlx 超分端点。 |
+
+### 模型准备（用于 `FUSION_H3_SR=1`）
+
+- 需要暴露 RealESRGAN 超分端点（`/v1/images/super-resolution`）的 fusion-mlx
+  版本（已在 PR-A fusion-mlx 版本中落地——属于独立的 fusion-mlx 版本依赖，请
+  查阅 fusion-mlx 更新日志）。
+- 通过镜像 `https://hf-mirror.com` 下载 `RealESRGAN_x4plus.pth`，转换为
+  safetensors，放置于
+  `~/.fusion-mlx/models/realesrgan/RealESRGAN_x4plus.safetensors`。
+
+超分为失败即报错模式：若端点调用失败，`SaveVideo` 将抛出异常——不会静默回退到
+模糊的原始帧。
+
+```bash
+# 示例：真实 4x 超分
+FUSION_H3_SR=1 FUSION_H3_SR_SCALE=4
+
+# 示例：4x 过慢时使用 2x 超分
+FUSION_H3_SR=1 FUSION_H3_SR_SCALE=2
+
+# 示例：mock 模式（链路验证，无 SR 模型）
+FUSION_H3_SR=mock
+```
+
 ## 上游依赖
 
 Phase 1 和 Phase 2 上游问题（已全部解决）：

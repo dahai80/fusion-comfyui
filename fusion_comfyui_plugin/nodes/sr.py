@@ -1,11 +1,36 @@
 import base64
 import io
+import json
 import logging
+import os
 import time
 
 import numpy as np
 
 logger = logging.getLogger("fusion_comfyui.nodes.sr")
+
+_MLX_SETTINGS_PATH = os.environ.get(
+    "FUSION_MLX_SETTINGS", "~/.fusion-mlx/settings.json"
+)
+
+
+def _resolve_mlx_api_key():
+    # Mirror nodes/voice.py:_resolve_mlx_api_key — the SR endpoint shares the
+    # same verify_api_key dependency as every other fusion-mlx route. A
+    # key-configured server (FUSION_ALLOW_ANONYMOUS unset) rejects a headerless
+    # request with 401, so real-mode SR MUST authenticate.
+    key = os.environ.get("FUSION_MLX_API_KEY", "").strip()
+    if key:
+        return key
+    try:
+        with open(os.path.expanduser(_MLX_SETTINGS_PATH)) as f:
+            data = json.load(f)
+        k = data.get("auth", {}).get("api_key", "")
+        if k:
+            return k
+    except Exception as e:
+        logger.debug("sr: read mlx settings api_key failed: %s", e)
+    return ""
 
 
 def _mock_resize(images: np.ndarray, scale: int) -> np.ndarray:
@@ -43,10 +68,17 @@ def _real_sr(images, scale, endpoint):
     if not url.endswith("/v1/images/super-resolution"):
         url = f"{url}/v1/images/super-resolution"
     logger.info("sr real: %d frames scale=%d endpoint=%s", n, scale, url)
+    headers = {}
+    api_key = _resolve_mlx_api_key()
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+        headers["x-api-key"] = api_key
+    else:
+        logger.info("sr real: no mlx api_key resolved (anonymous mode expected)")
     max_retries = 3
     t0 = time.time()
     sr_frames = []
-    with httpx.Client(timeout=60.0) as client:
+    with httpx.Client(timeout=120.0) as client:
         for i in range(n):
             frame = (np.clip(images[i], 0, 1) * 255).astype(np.uint8)[:, :, :3]
             buf = io.BytesIO()
@@ -58,6 +90,7 @@ def _real_sr(images, scale, endpoint):
                 try:
                     resp = client.post(
                         url,
+                        headers=headers,
                         files={"image": (f"frame_{i}.png", png, "image/png")},
                         data={"scale": str(scale), "tile_size": "512"},
                     )

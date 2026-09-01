@@ -37,60 +37,63 @@ def _real_sr(images, scale, endpoint):
     from PIL import Image
 
     n, h, w, _ = images.shape
-    url = endpoint if endpoint.endswith("/super-resolution") \
-        else f"{endpoint.rstrip('/')}/v1/images/super-resolution"
+    if n == 0:
+        return np.empty((0, 0, 0, 3), dtype=np.float32)
+    url = endpoint.rstrip('/')
+    if not url.endswith("/v1/images/super-resolution"):
+        url = f"{url}/v1/images/super-resolution"
     logger.info("sr real: %d frames scale=%d endpoint=%s", n, scale, url)
     max_retries = 3
     t0 = time.time()
     sr_frames = []
-    for i in range(n):
-        frame = (np.clip(images[i], 0, 1) * 255).astype(np.uint8)[:, :, :3]
-        buf = io.BytesIO()
-        Image.fromarray(frame).save(buf, format="PNG")
-        png = buf.getvalue()
-        ft0 = time.time()
-        resp = None
-        for attempt in range(1, max_retries + 1):
-            try:
-                with httpx.Client(timeout=60.0) as client:
+    with httpx.Client(timeout=60.0) as client:
+        for i in range(n):
+            frame = (np.clip(images[i], 0, 1) * 255).astype(np.uint8)[:, :, :3]
+            buf = io.BytesIO()
+            Image.fromarray(frame).save(buf, format="PNG")
+            png = buf.getvalue()
+            ft0 = time.time()
+            resp = None
+            for attempt in range(1, max_retries + 1):
+                try:
                     resp = client.post(
                         url,
                         files={"image": (f"frame_{i}.png", png, "image/png")},
                         data={"scale": str(scale), "tile_size": "512"},
                     )
-            except Exception as e:
-                logger.warning("sr real: frame %d attempt %d request failed: %s",
-                               i, attempt, e)
-                if attempt >= max_retries:
+                except (httpx.TransportError, httpx.RequestError) as e:
+                    logger.warning("sr real: frame %d attempt %d request failed: %s",
+                                   i, attempt, e)
+                    if attempt >= max_retries:
+                        raise RuntimeError(
+                            f"SR frame {i} failed after {max_retries} attempts "
+                            f"({endpoint}): {e}") from e
+                    time.sleep(2 * attempt)
+                    continue
+                if resp.status_code == 200:
+                    break
+                transient = resp.status_code >= 500
+                logger.warning("sr real: frame %d attempt %d HTTP %s: %s",
+                               i, attempt, resp.status_code, resp.text[:200])
+                if not transient or attempt >= max_retries:
                     raise RuntimeError(
-                        f"SR frame {i} failed after {max_retries} attempts "
-                        f"({endpoint}): {e}") from e
+                        f"SR frame {i} HTTP {resp.status_code} ({endpoint}): "
+                        f"{resp.text[:200]}")
                 time.sleep(2 * attempt)
-                continue
-            if resp.status_code == 200:
-                break
-            transient = resp.status_code >= 500
-            logger.warning("sr real: frame %d attempt %d HTTP %s: %s",
-                           i, attempt, resp.status_code, resp.text[:200])
-            if not transient or attempt >= max_retries:
+            if resp is None or resp.status_code != 200:
                 raise RuntimeError(
-                    f"SR frame {i} HTTP {resp.status_code} ({endpoint}): "
-                    f"{resp.text[:200]}")
-            time.sleep(2 * attempt)
-        if resp is None or resp.status_code != 200:
-            raise RuntimeError(
-                f"SR frame {i}: no successful response from {endpoint}")
-        body = resp.json()
-        sr_bytes = base64.b64decode(body["image_b64"])
-        if not sr_bytes:
-            raise RuntimeError(
-                f"SR frame {i}: empty image_b64 from {endpoint}")
-        sr_arr = np.array(Image.open(io.BytesIO(sr_bytes)).convert("RGB"),
-                          dtype=np.float32) / 255.0
-        sr_frames.append(sr_arr)
-        logger.info("sr real: frame %d/%d in=%dx%d out=%dx%d elapsed=%.2fs",
-                    i + 1, n, w, h, sr_arr.shape[1], sr_arr.shape[0],
-                    time.time() - ft0)
+                    f"SR frame {i}: no successful response from {endpoint}")
+            body = resp.json()
+            sr_bytes = base64.b64decode(body["image_b64"])
+            if not sr_bytes:
+                raise RuntimeError(
+                    f"SR frame {i}: empty image_b64 from {endpoint}")
+            sr_arr = np.array(Image.open(io.BytesIO(sr_bytes)).convert("RGB"),
+                              dtype=np.float32) / 255.0
+            sr_frames.append(sr_arr)
+            logger.info("sr real: frame %d/%d in=%dx%d out=%dx%d elapsed=%.2fs",
+                        i + 1, n, w, h, sr_arr.shape[1], sr_arr.shape[0],
+                        time.time() - ft0)
     logger.info("sr real: done %d frames total elapsed=%.2fs",
                 n, time.time() - t0)
     return np.stack(sr_frames, axis=0).astype(np.float32)

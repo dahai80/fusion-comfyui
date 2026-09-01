@@ -270,7 +270,20 @@ class SaveVideo:
         # fusion-mlx SR, mock=lanczos placeholder. Fail-loud: raises on SR
         # error, no silent fallback to the blurry original (project Rule 12).
         sr_mode = os.environ.get("FUSION_H3_SR", "0")
-        sr_scale = int(os.environ.get("FUSION_H3_SR_SCALE", "4"))
+        if sr_mode not in ("0", "1", "mock", ""):
+            raise RuntimeError(
+                f"SaveVideo(H3): unknown FUSION_H3_SR={sr_mode!r}, "
+                f"expected one of: 0, 1, mock")
+        try:
+            sr_scale = int(os.environ.get("FUSION_H3_SR_SCALE", "4"))
+        except ValueError as e:
+            raise RuntimeError(
+                f"SaveVideo(H3): FUSION_H3_SR_SCALE="
+                f"{os.environ.get('FUSION_H3_SR_SCALE')!r} is not an integer"
+            ) from e
+        if sr_mode in ("1", "mock") and sr_scale not in (2, 4):
+            raise RuntimeError(
+                f"SaveVideo(H3): FUSION_H3_SR_SCALE={sr_scale} not in (2, 4)")
         sr_endpoint = os.environ.get(
             "FUSION_H3_SR_ENDPOINT",
             "http://127.0.0.1:11434/v1/images/super-resolution")

@@ -178,3 +178,102 @@ class TestSaveVideoSR:
         SaveVideo().save(video=video, filename_prefix="h3_sr")
         _, shape = encoded[0]
         assert shape[1] == 32 and shape[2] == 40  # 2x
+
+    def test_savevideo_sr_unknown_mode_raises_no_silent_encode(self, monkeypatch, tmp_path):
+        encoded = []
+        self._setup_savevideo(monkeypatch, tmp_path, encoded)
+        monkeypatch.setenv("FUSION_H3_SR", "true")
+        from fusion_comfyui_plugin.nodes.h3 import SaveVideo
+        video = {"images": np.zeros((2, 16, 20, 3), dtype=np.float32), "fps": 24.0}
+        with pytest.raises(RuntimeError, match="unknown FUSION_H3_SR"):
+            SaveVideo().save(video=video, filename_prefix="h3_sr")
+        assert encoded == []  # no silent blurry encode
+
+    def test_savevideo_sr_bad_scale_raises(self, monkeypatch, tmp_path):
+        encoded = []
+        self._setup_savevideo(monkeypatch, tmp_path, encoded)
+        monkeypatch.setenv("FUSION_H3_SR", "mock")
+        monkeypatch.setenv("FUSION_H3_SR_SCALE", "3")
+        from fusion_comfyui_plugin.nodes.h3 import SaveVideo
+        video = {"images": np.zeros((2, 16, 20, 3), dtype=np.float32), "fps": 24.0}
+        with pytest.raises(RuntimeError, match="not in \\(2, 4\\)"):
+            SaveVideo().save(video=video, filename_prefix="h3_sr")
+
+    def test_savevideo_sr_non_numeric_scale_raises(self, monkeypatch, tmp_path):
+        encoded = []
+        self._setup_savevideo(monkeypatch, tmp_path, encoded)
+        monkeypatch.setenv("FUSION_H3_SR", "mock")
+        monkeypatch.setenv("FUSION_H3_SR_SCALE", "fast")
+        from fusion_comfyui_plugin.nodes.h3 import SaveVideo
+        video = {"images": np.zeros((2, 16, 20, 3), dtype=np.float32), "fps": 24.0}
+        with pytest.raises(RuntimeError, match="not an integer"):
+            SaveVideo().save(video=video, filename_prefix="h3_sr")
+
+
+def test_sr_real_non_transport_exception_propagates_no_retry():
+    from fusion_comfyui_plugin.nodes.sr import super_resolve_frames
+
+    calls = []
+
+    class FakeClient:
+        def __init__(self, *a, **k):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def post(self, url, **k):
+            calls.append(1)
+            raise ValueError("programming bug, not transient")
+
+    with patch("httpx.Client", FakeClient):
+        imgs = np.zeros((1, 8, 8, 3), dtype=np.float32)
+        with pytest.raises(ValueError, match="programming bug"):
+            super_resolve_frames(imgs, mode="1", scale=4)
+    assert len(calls) == 1, "non-transport exception must not retry"
+
+
+def test_sr_real_empty_input_returns_empty_array():
+    from fusion_comfyui_plugin.nodes.sr import super_resolve_frames
+    imgs = np.zeros((0, 8, 8, 3), dtype=np.float32)
+    out = super_resolve_frames(imgs, mode="1", scale=4)
+    assert out.shape == (0, 0, 0, 3), out.shape
+    assert out.dtype == np.float32
+
+
+def test_sr_url_normalization_trailing_slash():
+    from fusion_comfyui_plugin.nodes.sr import super_resolve_frames
+
+    captured = {}
+
+    class FakeResp:
+        status_code = 200
+        text = ""
+
+        def json(self):
+            return _fake_sr_response(8, 8)
+
+    class FakeClient:
+        def __init__(self, *a, **k):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def post(self, url, **k):
+            captured["url"] = url
+            return FakeResp()
+
+    with patch("httpx.Client", FakeClient):
+        imgs = np.random.rand(1, 8, 8, 3).astype(np.float32)
+        super_resolve_frames(
+            imgs, mode="1", scale=4,
+            endpoint="http://host/v1/images/super-resolution/")
+    assert captured["url"] == "http://host/v1/images/super-resolution", captured
+

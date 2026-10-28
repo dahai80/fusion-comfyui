@@ -83,7 +83,10 @@ do_start() {
         return 2
     fi
     log "starting ComfyUI on $HOST:$PORT ..."
-    nohup "$VENV_PYTHON" "$PROJECT_DIR/ComfyUI/main.py" \
+    # Launch through the repo launcher (fusion_comfyui/launch_comfyui.py) so the
+    # process title shows "fusion-comfyui serve :PORT" (issue #74) instead of a
+    # bare homebrew "Python" running upstream ComfyUI/main.py.
+    nohup "$VENV_PYTHON" "$PROJECT_DIR/fusion_comfyui/launch_comfyui.py" \
         --listen "$HOST" --port "$PORT" \
         > "$LOG_FILE" 2>&1 &
     local pid=$!
@@ -185,7 +188,7 @@ install_launchd() {
     <key>ProgramArguments</key>
     <array>
         <string>${py_bin}</string>
-        <string>${PROJECT_DIR}/ComfyUI/main.py</string>
+        <string>${PROJECT_DIR}/fusion_comfyui/launch_comfyui.py</string>
         <string>--listen</string>
         <string>${HOST}</string>
         <string>--port</string>

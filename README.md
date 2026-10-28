@@ -121,6 +121,13 @@ This is a deliberate, declared exception to the monorepo HTTP-routing convention
 Requires `fusion-mlx` to be importable in the same `.venv` (installed via the
 shared monorepo virtualenv at `/Users/dahai/fusion/.venv`).
 
+API-key resolution is delegated to `fusion_core.config.resolve_api_key`
+(`fusion-core>=0.7.0`, single-point config resolution, issue #75): env
+`FUSION_MLX_API_KEY` first, then `auth.api_key` in
+`~/.fusion-mlx/settings.json`. No hand-rolled key resolvers live in this repo;
+call sites degrade to anonymous (empty key) with a warning when the settings
+file is missing or malformed.
+
 ## Phase 3 Configuration
 
 Phase 3 features are controlled via environment variables. Speculative denoising
@@ -276,7 +283,7 @@ cd FusionComfyUI && swift run
 ```
 
 Components:
-- `start.sh` — repo-root lifecycle manager (`start|stop|status|log|restart`); uses `FUSION_VENV` (default `/Users/dahai/fusion/.venv`), runs `python ComfyUI/main.py --port 11445 --listen 127.0.0.1`, pidfile + `wait_healthy`, sets `HF_MIRROR=https://hf-mirror.com`.
+- `start.sh` — repo-root lifecycle manager (`start|stop|status|log|restart`); uses `FUSION_VENV` (default `/Users/dahai/fusion/.venv`), runs `python fusion_comfyui/launch_comfyui.py --port 11445 --listen 127.0.0.1` (thin launcher that sets the process title to `fusion-comfyui serve :PORT` via setproctitle — issue #74 — then runs `ComfyUI/main.py` unmodified), pidfile + `wait_healthy`, sets `HF_MIRROR=https://hf-mirror.com`.
 - `SetupManager.swift` — first-run dependency bootstrap: finds Homebrew Python ≥3.11, creates `~/.fusion-comfyui/venv`, pip-installs ComfyUI requirements + `fusion-mlx` via hf-mirror, streams progress; gates the main UI until ready.
 - `ServerManager.swift` — launches `start.sh start` with `FUSION_VENV` in the child env, probes `GET /system_stats` until healthy, exposes `.stopped/.starting/.running/.failed` state.
 - `ModelManager.swift` — lists models from `/object_info` + local `~/.fusion-mlx/models` cache; `Pull` button runs `fusion-mlx pull <repo>` with `HF_MIRROR=https://hf-mirror.com` and streams output.

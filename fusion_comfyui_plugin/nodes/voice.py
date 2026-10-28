@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import os
 import tempfile
@@ -16,19 +15,18 @@ _MLX_SETTINGS_PATH = os.path.expanduser(
 )
 
 
-def _resolve_mlx_api_key():
-    key = os.environ.get("FUSION_MLX_API_KEY", "").strip()
-    if key:
-        return key
+def _mlx_api_key():
+    # Single-point resolution lives in fusion_core.config (issue #75).
+    from fusion_core.config import resolve_api_key
+
     try:
-        with open(_MLX_SETTINGS_PATH) as f:
-            data = json.load(f)
-        k = data.get("auth", {}).get("api_key", "")
-        if k:
-            return k
+        return resolve_api_key(settings_path=_MLX_SETTINGS_PATH)
     except Exception as e:
-        logger.debug("FusionVoice HTTP: read mlx settings api_key failed: %s", e)
-    return ""
+        # Malformed/unreadable settings.json must not crash TTS — old local
+        # resolver degraded to anonymous; keep that behavior (issue #75:
+        # no behavior change).
+        logger.warning("FusionVoice HTTP: resolve_api_key failed, anonymous fallback: %s", e)
+        return ""
 
 
 def _resolve_mlx_base_url():
@@ -249,7 +247,7 @@ class FusionVoiceSynthesizeNode:
             # fusion-design 等直连客户端约定一致. gateway 部署时由 gateway 注入, 此处冗余无害.
             "X-Fusion-Route": "fusion-comfyui",
         }
-        api_key = _resolve_mlx_api_key()
+        api_key = _mlx_api_key()
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
             headers["x-api-key"] = api_key

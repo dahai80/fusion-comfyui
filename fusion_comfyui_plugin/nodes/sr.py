@@ -1,6 +1,5 @@
 import base64
 import io
-import json
 import logging
 import os
 import time
@@ -9,28 +8,26 @@ import numpy as np
 
 logger = logging.getLogger("fusion_comfyui.nodes.sr")
 
-_MLX_SETTINGS_PATH = os.environ.get(
-    "FUSION_MLX_SETTINGS", "~/.fusion-mlx/settings.json"
-)
 
+def _mlx_api_key():
+    # Single-point resolution lives in fusion_core.config (issue #75). The SR
+    # endpoint shares the same verify_api_key dependency as every other
+    # fusion-mlx route — a key-configured server rejects a headerless request
+    # with 401, so real-mode SR MUST authenticate.
+    from fusion_core.config import resolve_api_key
 
-def _resolve_mlx_api_key():
-    # Mirror nodes/voice.py:_resolve_mlx_api_key — the SR endpoint shares the
-    # same verify_api_key dependency as every other fusion-mlx route. A
-    # key-configured server (FUSION_ALLOW_ANONYMOUS unset) rejects a headerless
-    # request with 401, so real-mode SR MUST authenticate.
-    key = os.environ.get("FUSION_MLX_API_KEY", "").strip()
-    if key:
-        return key
     try:
-        with open(os.path.expanduser(_MLX_SETTINGS_PATH)) as f:
-            data = json.load(f)
-        k = data.get("auth", {}).get("api_key", "")
-        if k:
-            return k
+        return resolve_api_key(
+            settings_path=os.path.expanduser(
+                os.environ.get("FUSION_MLX_SETTINGS", "~/.fusion-mlx/settings.json")
+            )
+        )
     except Exception as e:
-        logger.debug("sr: read mlx settings api_key failed: %s", e)
-    return ""
+        # Malformed/unreadable settings.json must not crash SR — old local
+        # resolver degraded to anonymous; keep that behavior (issue #75:
+        # no behavior change).
+        logger.warning("sr: resolve_api_key failed, anonymous fallback: %s", e)
+        return ""
 
 
 def _mock_resize(images: np.ndarray, scale: int) -> np.ndarray:
@@ -69,7 +66,7 @@ def _real_sr(images, scale, endpoint):
         url = f"{url}/v1/images/super-resolution"
     logger.info("sr real: %d frames scale=%d endpoint=%s", n, scale, url)
     headers = {}
-    api_key = _resolve_mlx_api_key()
+    api_key = _mlx_api_key()
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
         headers["x-api-key"] = api_key

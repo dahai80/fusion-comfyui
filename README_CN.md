@@ -109,7 +109,7 @@ FUSION_NVFP4_THRESHOLD_GB=8
 | `FUSION_H3_SR` | `0` | `0` \| `1` \| `mock` | `0` = 关闭（不做超分）。`1` = 真实 fusion-mlx RealESRGAN 逐帧超分。`mock` = lanczos 4x 占位，用于在无 SR 模型时验证链路。 |
 | `FUSION_H3_SR_SCALE` | `4` | `4` \| `2` | 放大倍数。永不自动降级——由操作者显式选择。 |
 | `FUSION_H3_SR_ENDPOINT` | `http://127.0.0.1:11434/v1/images/super-resolution` | URL | fusion-mlx 超分端点。 |
-| `FUSION_MLX_API_KEY` | 未设置 | 字符串 | 发往 fusion-mlx 超分端点的 API 密钥（Bearer + x-api-key）。设为 fusion-mlx 当前强制使用的同一密钥（fusion-mlx 启动时的 `FUSION_MLX_API_KEY` 环境变量会覆盖 `~/.fusion-mlx/settings.json`）；配置了密钥的服务端会以 401 拒绝无鉴权头的请求。 |
+| `FUSION_CLIENT_KEY` | 未设置 | 字符串 | 发往 fusion-mlx 超分端点的 API 密钥（Bearer + x-api-key）。配置契约规范名（issue #76）；旧名 `FUSION_MLX_API_KEY` 仍经 fusion-core 别名链解析。注意 `start.sh` 会清掉继承的 client key 环境变量——鉴权统一来自 `~/.fusion-mlx/settings.json`；配置了密钥的服务端会以 401 拒绝无鉴权头的请求。 |
 
 ### 模型准备（用于 `FUSION_H3_SR=1`）
 
@@ -147,10 +147,10 @@ FUSION_NVFP4_THRESHOLD_GB=8
 
 ```bash
 # 示例：真实 4x 超分（离线，画质优先于速度）
-FUSION_H3_SR=1 FUSION_H3_SR_SCALE=4 FUSION_MLX_API_KEY=<your-key>
+FUSION_H3_SR=1 FUSION_H3_SR_SCALE=4 FUSION_CLIENT_KEY=<your-key>
 
 # 示例：2x 超分（文件更小；并非更快——见上方时间预算）
-FUSION_H3_SR=1 FUSION_H3_SR_SCALE=2 FUSION_MLX_API_KEY=<your-key>
+FUSION_H3_SR=1 FUSION_H3_SR_SCALE=2 FUSION_CLIENT_KEY=<your-key>
 
 # 示例：mock 模式（链路验证 / 截止安全默认值，无 SR 模型）
 FUSION_H3_SR=mock

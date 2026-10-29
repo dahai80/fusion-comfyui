@@ -28,9 +28,15 @@ export TRANSFORMERS_OFFLINE="${TRANSFORMERS_OFFLINE:-1}"
 # 2nd pass) can exceed the 600s default on Apple Silicon.
 export FUSION_IMAGE_TIMEOUT="${FUSION_IMAGE_TIMEOUT:-3600}"
 
-# 运维修补：清掉 shell 继承的 FUSION_MLX_API_KEY（可能过期 → TTS http backend 401）。
+# 运维修补：清掉 shell 继承的 client key 环境变量（可能过期 → TTS http backend 401）。
 # 统一走 ~/.fusion-mlx/settings.json auth.api_key，与 mlx daemon 同源。
-unset FUSION_MLX_API_KEY
+# 按模式匹配清理（覆盖 fusion-core 别名链里的历史名与规范名 FUSION_CLIENT_KEY），
+# 不在本文件写出 legacy 字面量（check-env 规则 2c，issue #76）。
+while IFS='=' read -r _env_k _; do
+    case "$_env_k" in
+        FUSION_*KEY|MLX_*KEY) unset "$_env_k" ;;
+    esac
+done < <(env)
 
 mkdir -p "$RUN_DIR"
 
@@ -77,6 +83,19 @@ do_start() {
         pid="$(get_pid)"
         log "already running PID=$pid on $HOST:$PORT"
         return 0
+    fi
+    # Phase 3.3 (issue #76): verify our port-registry.yaml entry before serving
+    # so an unregistered port fails at start instead of at CI.
+    SERVICE="fusion-comfyui"
+    REGISTRY="${FUSION_REGISTRY:-$HOME/fusion/architecture/port-registry.yaml}"
+    if [ ! -f "$REGISTRY" ]; then
+        log "warn: port-registry.yaml not found at $REGISTRY — registry self-check skipped"
+    elif ! grep -A3 "^  ${SERVICE}:" "$REGISTRY" 2>/dev/null | grep -q "port: $PORT$"; then
+        if [ "${FUSION_SKIP_REGISTRY_CHECK:-}" != "1" ]; then
+            log "ERROR: port $PORT for ${SERVICE} not registered in $REGISTRY — refusing to start"
+            return 1
+        fi
+        log "warn: registry check bypassed (FUSION_SKIP_REGISTRY_CHECK=1)"
     fi
     if [ ! -x "$VENV_PYTHON" ]; then
         log "ERROR: venv python not found at $VENV_PYTHON"
@@ -230,7 +249,7 @@ PLIST
     launchctl load "${_LAUNCHD_PLIST}" 2>/dev/null || true
     log "LaunchAgent installed and loaded: ${_LAUNCHD_PLIST}"
     log "ComfyUI will auto-start on login and restart on crash/stop"
-    log "NOTE: FUSION_MLX_API_KEY intentionally NOT set in plist -> TTS http backend uses ~/.fusion-mlx/settings.json"
+    log "NOTE: client-key env intentionally NOT set in plist -> TTS http backend uses ~/.fusion-mlx/settings.json"
 }
 
 uninstall_launchd() {

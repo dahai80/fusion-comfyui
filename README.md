@@ -123,10 +123,13 @@ shared monorepo virtualenv at `/Users/dahai/fusion/.venv`).
 
 API-key resolution is delegated to `fusion_core.config.resolve_api_key`
 (`fusion-core>=0.7.0`, single-point config resolution, issue #75): env
-`FUSION_MLX_API_KEY` first, then `auth.api_key` in
-`~/.fusion-mlx/settings.json`. No hand-rolled key resolvers live in this repo;
-call sites degrade to anonymous (empty key) with a warning when the settings
-file is missing or malformed.
+`FUSION_CLIENT_KEY` first (the fusion-core alias chain still accepts the
+deprecated `FUSION_MLX_API_KEY` / `MLX_API_KEY` names with a warning), then
+`auth.api_key` in `~/.fusion-mlx/settings.json`. No hand-rolled key resolvers
+live in this repo; call sites degrade to anonymous (empty key) with a warning
+when the settings file is missing or malformed. `start.sh` clears any inherited
+client-key env vars (glob-matched, issue #76) so auth always comes from
+`~/.fusion-mlx/settings.json`, same source as the mlx daemon.
 
 ## Phase 3 Configuration
 
@@ -166,7 +169,7 @@ at save time and is off by default.
 | `FUSION_H3_SR` | `0` | `0` \| `1` \| `mock` | `0` = off (no SR). `1` = real fusion-mlx RealESRGAN per-frame SR. `mock` = lanczos 4x placeholder for chain verification without the SR model. |
 | `FUSION_H3_SR_SCALE` | `4` | `4` \| `2` | Upscale factor. Never auto-downgrades — explicit operator choice. |
 | `FUSION_H3_SR_ENDPOINT` | `http://127.0.0.1:11434/v1/images/super-resolution` | URL | fusion-mlx SR endpoint. |
-| `FUSION_MLX_API_KEY` | unset | string | API key sent to the fusion-mlx SR endpoint (Bearer + x-api-key). Set to the same key fusion-mlx enforces (`FUSION_MLX_API_KEY` env on the fusion-mlx launch overrides `~/.fusion-mlx/settings.json`); a key-configured server 401-rejects a headerless request. |
+| `FUSION_CLIENT_KEY` | unset | string | API key sent to the fusion-mlx SR endpoint (Bearer + x-api-key). Canonical name from the fusion-core config contract (issue #76); deprecated `FUSION_MLX_API_KEY` still resolves via the fusion-core alias chain. Note `start.sh` clears inherited client-key env vars — auth comes from `~/.fusion-mlx/settings.json`; a key-configured server 401-rejects a headerless request. |
 
 ### Model setup (for `FUSION_H3_SR=1`)
 
@@ -206,10 +209,10 @@ wall-clock.
 
 ```bash
 # Example: real 4x SR (offline, sharpness over speed)
-FUSION_H3_SR=1 FUSION_H3_SR_SCALE=4 FUSION_MLX_API_KEY=<your-key>
+FUSION_H3_SR=1 FUSION_H3_SR_SCALE=4 FUSION_CLIENT_KEY=<your-key>
 
 # Example: 2x SR (smaller files; NOT faster — see time budget above)
-FUSION_H3_SR=1 FUSION_H3_SR_SCALE=2 FUSION_MLX_API_KEY=<your-key>
+FUSION_H3_SR=1 FUSION_H3_SR_SCALE=2 FUSION_CLIENT_KEY=<your-key>
 
 # Example: mock mode (chain verification / deadline-safe default, no SR model)
 FUSION_H3_SR=mock

@@ -9,7 +9,7 @@ audience: engineer
 status: draft
 version: 0.2.17
 updated: 2026-11-07
-owner: @dahai
+owner: "@dahai"
 source_of_truth:
   - docs/superpowers/specs/2026-09-01-h3-video-sr-design.md
 ---

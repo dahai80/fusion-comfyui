@@ -9,7 +9,7 @@ audience: engineer
 status: draft
 version: 0.2.17
 updated: 2026-11-07
-owner: @dahai
+owner: "@dahai"
 source_of_truth:
   - docs/superpowers/specs/2026-08-26-p2-fork-image-type-numpy-design.md
 ---

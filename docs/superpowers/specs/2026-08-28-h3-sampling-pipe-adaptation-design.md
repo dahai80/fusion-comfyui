@@ -1,3 +1,19 @@
+---
+doc_id: fusion-comfyui/guide
+product: fusion-comfyui
+class: app
+entry: service
+doc_type: guide
+title: { zh: "H3 Sampling-Pipe Adaptation Design", en: "H3 Sampling-Pipe Adaptation Design" }
+audience: engineer
+status: draft
+version: 0.2.17
+updated: 2026-11-07
+owner: @dahai
+source_of_truth:
+  - docs/superpowers/specs/2026-08-28-h3-sampling-pipe-adaptation-design.md
+---
+
 # H3 Sampling-Pipe Adaptation Design
 
 **Goal:** Make AICF's native ComfyUI H3 workflows (h3-t2v/i2v/r2v) run on fusion-comfyui's MLX backend, so AICF can produce H3 video via fusion-comfyui instead of a separate CUDA ComfyUI.

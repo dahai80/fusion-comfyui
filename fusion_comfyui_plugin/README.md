@@ -1,3 +1,19 @@
+---
+doc_id: fusion-comfyui/readme
+product: fusion-comfyui
+class: app
+entry: service
+doc_type: readme
+title: { zh: "Fusion-MLX ComfyUI 插件说明", en: "ComfyUI-Fusion-MLX plugin README" }
+audience: engineer
+status: draft
+version: 0.2.17
+updated: 2026-11-07
+owner: @dahai
+source_of_truth:
+  - fusion_comfyui_plugin/README.md
+---
+
 # ComfyUI-Fusion-MLX
 
 General-purpose ComfyUI nodes running on Apple Silicon via fusion-mlx / MLX. No PyTorch runtime dependency for inference — models run pure MLX/Metal.

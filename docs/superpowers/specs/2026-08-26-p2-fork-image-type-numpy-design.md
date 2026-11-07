@@ -1,3 +1,19 @@
+---
+doc_id: fusion-comfyui/guide
+product: fusion-comfyui
+class: app
+entry: service
+doc_type: guide
+title: { zh: "P2: Fork ComfyUI IMAGE type to numpy (remove torch from I/O glue)", en: "P2: Fork ComfyUI IMAGE type to numpy (remove torch from I/O glue)" }
+audience: engineer
+status: draft
+version: 0.2.17
+updated: 2026-11-07
+owner: @dahai
+source_of_truth:
+  - docs/superpowers/specs/2026-08-26-p2-fork-image-type-numpy-design.md
+---
+
 # P2: Fork ComfyUI IMAGE type to numpy (remove torch from I/O glue)
 
 **Status:** DRAFT — awaiting user spec review

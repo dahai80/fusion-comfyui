@@ -1,3 +1,19 @@
+---
+doc_id: fusion-comfyui/readme
+product: fusion-comfyui
+class: app
+entry: service
+doc_type: readme
+title: { zh: "fusion-comfyui 产品说明（中文）", en: "fusion-comfyui README (Chinese)" }
+audience: engineer
+status: draft
+version: 0.2.17
+updated: 2026-11-07
+owner: @dahai
+source_of_truth:
+  - README_CN.md
+---
+
 # fusion-comfyui
 
 [English](README.md) | **中文**
@@ -9,17 +25,19 @@
 ## 快速开始
 
 ```bash
-# 安装
+# 安装（装入 monorepo 共享 venv）
 pip install -e .
 
-# 启动独立服务器（纯 MLX，无 PyTorch）
-fusion-comfyui serve --port 11443
+# 启动服务器（拉起内置 ComfyUI 宿主 + Fusion-MLX 插件）
+./start.sh start          # 默认 127.0.0.1:11445；stop/status/restart/log 见 start.sh
 
-# 或作为 ComfyUI 自定义节点运行（Phase 1，需要 PyTorch 宿主）
-cd ComfyUI && python main.py
+# 或直接运行宿主（与 start.sh 同一运行路径）
+/Users/dahai/fusion/.venv/bin/python fusion_comfyui/launch_comfyui.py --listen 127.0.0.1 --port 11445
 ```
 
-打开 `http://localhost:11443` — ComfyUI 前端直接连接。
+打开 `http://127.0.0.1:11445` — ComfyUI 前端直接连接。（独立 FastAPI 服务器与
+`fusion-comfyui serve` 控制台脚本已在 P1 统一（v0.2.13）中移除——ComfyUI 自身
+的编排是唯一运行时。）
 
 ## 架构
 
@@ -30,7 +48,7 @@ cd ComfyUI && python main.py
 | Phase 3 | 🔧 进行中 | 推测去噪机制 ✅（已落地，默认关闭，加速已证伪），Radix 缓存 ✅，统计节点 ✅，NVFP4 受阻（mlx#2962），异步调度需 fusion-mlx |
 | Phase 4 | 🔧 进行中 | Swift 应用拆分 ✅，ServerManager/ModelManager ✅，需要打包 |
 
-详见 [CONSTRUCTION_PLAN.md](CONSTRUCTION_PLAN.md)。
+详见 [scratch/CONSTRUCTION_PLAN.md](scratch/CONSTRUCTION_PLAN.md)。
 
 ## 项目结构
 

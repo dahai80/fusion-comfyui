@@ -1,3 +1,19 @@
+---
+doc_id: fusion-comfyui/guide
+product: fusion-comfyui
+class: app
+entry: service
+doc_type: guide
+title: { zh: "MiniMax-H3 Drama Pipeline — Design Spec", en: "MiniMax-H3 Drama Pipeline — Design Spec" }
+audience: engineer
+status: draft
+version: 0.2.17
+updated: 2026-11-07
+owner: @dahai
+source_of_truth:
+  - docs/superpowers/specs/2026-08-21-h3-drama-pipeline-design.md
+---
+
 # MiniMax-H3 Drama Pipeline — Design Spec
 
 **Date:** 2026-08-21

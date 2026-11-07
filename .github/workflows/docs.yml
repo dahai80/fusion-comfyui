@@ -1,0 +1,22 @@
+name: docs
+
+on:
+  pull_request:
+    paths:
+      - "**.md"
+      - "ci/validate_docs.py"
+      - ".github/workflows/docs.yml"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate docs contract
+        run: |
+          python3 ci/validate_docs.py --root . --product fusion-comfyui \
+            --class app --entry service \
+            --skip-dirs ".git,node_modules,.venv,dist,build,.build,templates,guidelines,.ruff_cache,.pytest_cache,.run,output,venv,scratch,ComfyUI,ComfyUI-IPAdapter-Flux,ComfyUI_IPAdapter_plus,ComfyUI_InstantID,ComfyUI_TiledIPAdapter,Diffusers_IPAdapter,IPAdapterWAN,LatentSync,LiveTalking,MuseTalk,PuLID,PuLID_ComfyUI,comfyui-anima-ipadapter,f5-tts-mlx,mlx-audio,FusionComfyUI.app,ComfyKit"

@@ -1,3 +1,19 @@
+---
+doc_id: fusion-comfyui/guide
+product: fusion-comfyui
+class: app
+entry: service
+doc_type: guide
+title: { zh: "PR-A: fusion-mlx RealESRGAN MLX Super-Resolution Engine — Implementation Plan", en: "PR-A: fusion-mlx RealESRGAN MLX Super-Resolution Engine — Implementation Plan" }
+audience: engineer
+status: draft
+version: 0.2.17
+updated: 2026-11-07
+owner: @dahai
+source_of_truth:
+  - docs/superpowers/plans/2026-09-01-pr-a-fusion-mlx-realesrgan-sr.md
+---
+
 # PR-A: fusion-mlx RealESRGAN MLX Super-Resolution Engine — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

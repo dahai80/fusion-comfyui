@@ -1,3 +1,19 @@
+---
+doc_id: fusion-comfyui/guide
+product: fusion-comfyui
+class: app
+entry: service
+doc_type: guide
+title: { zh: "性能诊断手册", en: "Performance diagnosis guide" }
+audience: engineer
+status: draft
+version: 0.2.17
+updated: 2026-11-07
+owner: @dahai
+source_of_truth:
+  - fusion_comfyui_plugin/docs/PERFORMANCE_DIAGNOSIS.md
+---
+
 # Performance Diagnosis & Memory Leak Risk Analysis
 
 **Date**: 2026-07-27

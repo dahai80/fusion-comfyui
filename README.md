@@ -1,3 +1,19 @@
+---
+doc_id: fusion-comfyui/readme
+product: fusion-comfyui
+class: app
+entry: service
+doc_type: readme
+title: { zh: "fusion-comfyui 产品说明", en: "fusion-comfyui README" }
+audience: engineer
+status: draft
+version: 0.2.17
+updated: 2026-11-07
+owner: @dahai
+source_of_truth:
+  - README.md
+---
+
 # fusion-comfyui
 
 **English** | [中文](README_CN.md)
@@ -9,17 +25,20 @@ Built on [fusion-mlx](https://github.com/dahai80/fusion-mlx) engine — FLUX.2, 
 ## Quick Start
 
 ```bash
-# Install
+# Install (into the shared monorepo venv)
 pip install -e .
 
-# Run standalone server (pure MLX, no PyTorch)
-fusion-comfyui serve --port 11443
+# Run the server (launches the vendored ComfyUI host + the Fusion-MLX plugin)
+./start.sh start          # default 127.0.0.1:11445; see start.sh for stop/status/restart/log
 
-# Or run as ComfyUI custom nodes (Phase 1, requires PyTorch host)
-cd ComfyUI && python main.py
+# Or run the host directly (same runtime path as start.sh)
+/Users/dahai/fusion/.venv/bin/python fusion_comfyui/launch_comfyui.py --listen 127.0.0.1 --port 11445
 ```
 
-Open `http://localhost:11443` — the ComfyUI frontend connects directly.
+Open `http://127.0.0.1:11445` — the ComfyUI frontend connects directly. (The
+standalone FastAPI server and its `fusion-comfyui serve` console script were
+removed in the P1 unification, v0.2.13 — ComfyUI's own orchestration is the
+sole runtime.)
 
 ## Architecture
 
@@ -30,7 +49,7 @@ Open `http://localhost:11443` — the ComfyUI frontend connects directly.
 | Phase 3 | 🔧 In Progress | Spec denoise machinery ✅ (landed, default-off, accel falsified), Radix cache ❌ (FALSIFIED — T5 embeddings not prefix-reusable; compile cache covers latency), stats node ✅, NVFP4 blocked (mlx#2962), async dispatch needs fusion-mlx |
 | Phase 4 | ✅ Done | Swift app ✅, first-run setup assistant ✅, DMG+icon ✅, exit criteria verified (launch 0.15s, hf-mirror pull, no-terminal e2e T2V) |
 
-See [CONSTRUCTION_PLAN.md](CONSTRUCTION_PLAN.md) for full details.
+See `scratch/CONSTRUCTION_PLAN.md` (local scratch dir, not tracked in git) for full details.
 
 ## Native Node Bridge Overrides (Phase 1)
 

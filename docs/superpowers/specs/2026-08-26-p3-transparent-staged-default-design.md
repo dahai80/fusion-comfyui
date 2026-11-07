@@ -1,3 +1,19 @@
+---
+doc_id: fusion-comfyui/guide
+product: fusion-comfyui
+class: app
+entry: service
+doc_type: guide
+title: { zh: "P3 — Transparent Staged Default: Design Spec", en: "P3 — Transparent Staged Default: Design Spec" }
+audience: engineer
+status: draft
+version: 0.2.17
+updated: 2026-11-07
+owner: @dahai
+source_of_truth:
+  - docs/superpowers/specs/2026-08-26-p3-transparent-staged-default-design.md
+---
+
 # P3 — Transparent Staged Default: Design Spec
 
 > **Status:** DRAFT — awaiting approval. Spec authority for the implementation plan.

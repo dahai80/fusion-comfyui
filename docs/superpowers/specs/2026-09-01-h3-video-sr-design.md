@@ -1,3 +1,19 @@
+---
+doc_id: fusion-comfyui/guide
+product: fusion-comfyui
+class: app
+entry: service
+doc_type: guide
+title: { zh: "H3 Video Super-Resolution Post-Processing Design", en: "H3 Video Super-Resolution Post-Processing Design" }
+audience: engineer
+status: draft
+version: 0.2.17
+updated: 2026-11-07
+owner: @dahai
+source_of_truth:
+  - docs/superpowers/specs/2026-09-01-h3-video-sr-design.md
+---
+
 # H3 Video Super-Resolution Post-Processing Design
 
 **Date:** 2026-09-01

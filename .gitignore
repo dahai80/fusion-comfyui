@@ -66,3 +66,6 @@ AppIcon.iconset/
 *.key
 secrets.*
 credentials.*
+
+# local scratch planning docs (not product documentation)
+scratch/

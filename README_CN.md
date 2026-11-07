@@ -48,7 +48,7 @@ pip install -e .
 | Phase 3 | 🔧 进行中 | 推测去噪机制 ✅（已落地，默认关闭，加速已证伪），Radix 缓存 ✅，统计节点 ✅，NVFP4 受阻（mlx#2962），异步调度需 fusion-mlx |
 | Phase 4 | 🔧 进行中 | Swift 应用拆分 ✅，ServerManager/ModelManager ✅，需要打包 |
 
-详见 [scratch/CONSTRUCTION_PLAN.md](scratch/CONSTRUCTION_PLAN.md)。
+详见 `scratch/CONSTRUCTION_PLAN.md` (local scratch dir, not tracked in git)。
 
 ## 项目结构
 

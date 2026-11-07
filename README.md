@@ -49,7 +49,7 @@ sole runtime.)
 | Phase 3 | 🔧 In Progress | Spec denoise machinery ✅ (landed, default-off, accel falsified), Radix cache ❌ (FALSIFIED — T5 embeddings not prefix-reusable; compile cache covers latency), stats node ✅, NVFP4 blocked (mlx#2962), async dispatch needs fusion-mlx |
 | Phase 4 | ✅ Done | Swift app ✅, first-run setup assistant ✅, DMG+icon ✅, exit criteria verified (launch 0.15s, hf-mirror pull, no-terminal e2e T2V) |
 
-See [scratch/CONSTRUCTION_PLAN.md](scratch/CONSTRUCTION_PLAN.md) for full details.
+See `scratch/CONSTRUCTION_PLAN.md` (local scratch dir, not tracked in git) for full details.
 
 ## Native Node Bridge Overrides (Phase 1)
 

@@ -7,7 +7,7 @@ doc_type: changelog
 title: { zh: "fusion-comfyui 变更记录", en: "fusion-comfyui changelog" }
 audience: engineer
 status: draft
-version: 0.2.19
+version: 0.2.20
 updated: 2026-11-07
 owner: "@dahai"
 source_of_truth:
@@ -17,9 +17,18 @@ source_of_truth:
 
 # Changelog
 
-Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow `pyproject.toml` (`0.2.19` as of this entry). Phase-level history and the falsification log (spec denoise, radix cache) live in `README.md`.
+Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow `pyproject.toml` (`0.2.20` as of this entry). Phase-level history and the falsification log (spec denoise, radix cache) live in `README.md`.
 
 ## Unreleased
+
+## 0.2.20 — 2026-11-26
+
+### Fixed
+
+- **CI green again (first success since 2026-11-07)**: the `macos-14` hosted runner label was retired and every run queued then got cancelled; moved both jobs to `macos-15` (6462a6a). With jobs actually executing, three latent fresh-checkout failures surfaced and were fixed:
+  - Module-level `import cv2` in `nodes/shortcuts.py` and `nodes/identity.py` broke plugin load on cv2-less environments; the sole use (RGB2BGR) is now a numpy channel flip (19fce63). Remaining cv2 call sites already import lazily.
+  - `sr.py`/`voice.py` imported `fusion_core.config` outside their try block, raising `ModuleNotFoundError` instead of degrading to an anonymous key on fusion-core-less environments; import now inside try (82d804f).
+  - `tests/test_process_title.py` asserted the gitignored `ComfyUI/` engine tree exists; both asserting tests now skip on checkouts without it (82d804f, 49ca5ce).
 
 ## 0.2.19 — 2026-11-26
 

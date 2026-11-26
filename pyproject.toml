@@ -56,6 +56,11 @@ line-length = 120
 select = ["E", "F", "W", "T", "N805", "S307", "S102"]
 ignore = ["E501", "E722", "E731", "E712", "E402", "E741"]
 
+[tool.ruff.lint.per-file-ignores]
+# ci/validate_docs.py is a stdlib-only CLI validator: print is intentional
+# stdout/stderr reporting (argparse-style CLI, no logging dependency).
+"ci/*" = ["T201"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

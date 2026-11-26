@@ -14,19 +14,20 @@ def _mlx_api_key():
     # endpoint shares the same verify_api_key dependency as every other
     # fusion-mlx route — a key-configured server rejects a headerless request
     # with 401, so real-mode SR MUST authenticate.
-    from fusion_core.config import resolve_api_key
-
     try:
+        from fusion_core.config import resolve_api_key
+
         return resolve_api_key(
             settings_path=os.path.expanduser(
                 os.environ.get("FUSION_MLX_SETTINGS", "~/.fusion-mlx/settings.json")
             )
         )
     except Exception as e:
-        # Malformed/unreadable settings.json must not crash SR — old local
+        # fusion-core is not on PyPI and is optional here (lazy dep); missing,
+        # malformed, or unreadable settings must not crash SR — old local
         # resolver degraded to anonymous; keep that behavior (issue #75:
         # no behavior change).
-        logger.warning("sr: resolve_api_key failed, anonymous fallback: %s", e)
+        logger.warning("sr: resolve_api_key unavailable/failed, anonymous fallback: %s", e)
         return ""
 
 

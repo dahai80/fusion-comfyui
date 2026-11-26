@@ -2,6 +2,8 @@ import os
 import sys
 import types
 
+import pytest
+
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -61,6 +63,11 @@ class TestLauncherWiring:
     def test_comfyui_main_resolves(self):
         here = os.path.dirname(os.path.abspath(launch_comfyui.__file__))
         comfy_main = os.path.join(os.path.dirname(here), "ComfyUI", "main.py")
+        if not os.path.isfile(comfy_main):
+            # ComfyUI/ is gitignored (operator clones bring their own fork);
+            # the checkout on CI has no ComfyUI/ — only assert on machines
+            # that actually have the engine tree next to the package.
+            pytest.skip("ComfyUI/ engine tree not present (gitignored)")
         assert os.path.isfile(comfy_main)
 
 

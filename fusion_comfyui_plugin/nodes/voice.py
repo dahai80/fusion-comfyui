@@ -17,15 +17,16 @@ _MLX_SETTINGS_PATH = os.path.expanduser(
 
 def _mlx_api_key():
     # Single-point resolution lives in fusion_core.config (issue #75).
-    from fusion_core.config import resolve_api_key
-
     try:
+        from fusion_core.config import resolve_api_key
+
         return resolve_api_key(settings_path=_MLX_SETTINGS_PATH)
     except Exception as e:
-        # Malformed/unreadable settings.json must not crash TTS — old local
+        # fusion-core is optional here (lazy dep, not on PyPI); missing,
+        # malformed, or unreadable settings must not crash TTS — old local
         # resolver degraded to anonymous; keep that behavior (issue #75:
         # no behavior change).
-        logger.warning("FusionVoice HTTP: resolve_api_key failed, anonymous fallback: %s", e)
+        logger.warning("FusionVoice HTTP: resolve_api_key unavailable/failed, anonymous fallback: %s", e)
         return ""
 
 

@@ -73,6 +73,12 @@ class TestLauncherWiring:
 
 class TestMainDispatch:
     def test_main_runs_comfyui_with_argv0_swapped(self, monkeypatch):
+        here = os.path.dirname(os.path.abspath(launch_comfyui.__file__))
+        comfy_main = os.path.join(os.path.dirname(here), "ComfyUI", "main.py")
+        if not os.path.isfile(comfy_main):
+            # main() hard-fails without the engine tree; ComfyUI/ is gitignored
+            # so the CI checkout has none — skip there (see TestLauncherWiring).
+            pytest.skip("ComfyUI/ engine tree not present (gitignored)")
         recorded = {}
 
         def fake_run_path(path, run_name):

@@ -3,7 +3,6 @@ import logging
 import os
 import tempfile
 
-import cv2
 import mlx.core as mx
 import numpy as np
 from PIL import Image
@@ -388,7 +387,9 @@ def _image_to_bgr(image_np: np.ndarray) -> np.ndarray:
         arr = arr[0]
     if arr.ndim == 3 and arr.shape[2] == 4:
         arr = arr[:, :, :3]
-    bgr = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
+    # RGB->BGR channel flip via numpy; cv2 is not a declared dependency and a
+    # module-level cv2 import here used to break plugin load on cv2-less envs.
+    bgr = np.ascontiguousarray(arr[:, :, ::-1])
     return bgr
 
 
